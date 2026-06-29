@@ -26,6 +26,14 @@ This project currently covers:
 - Driver management page
 - Local React state for search, filtering, and adding vehicle/driver records
 
+### Milestone 3: Customer, Route & Trip Management
+
+- Customer management page section
+- Route management page section
+- Trip management page section
+- Local React state for search, filtering, and adding customer/route/trip records
+- Mock frontend data only
+
 Not included yet:
 
 - Backend or API integration
@@ -33,7 +41,6 @@ Not included yet:
 - Production authentication provider
 - Load management
 - Dispatch workflow
-- Customer management
 - Reports module
 - Settings module
 - Real AI logic or optimization features
@@ -67,9 +74,10 @@ npm run lint
 - `/login` — Public mock login page
 - `/` — Protected overview page
 - `/vehicles-drivers` — Protected vehicle and driver management page
+- `/customers-routes-trips` — Protected customer, route, and trip management page
 - `/design-system` — Protected UI foundation/reference page
 - `*` — Static not-found page
 
 ## Milestone note
 
-Milestone 2 is intentionally limited to authentication plus vehicle and driver management. Authentication is a frontend demo only and is not production security. Future milestones can add backend APIs, database persistence, load/dispatch/customer workflows, reporting, settings, and AI-assisted features.
+Milestone 3 adds frontend-only customer, route, and trip management while keeping authentication as a demo-only frontend session. Future milestones can add backend APIs, database persistence, load/dispatch workflows, reporting, settings, and AI-assisted features.

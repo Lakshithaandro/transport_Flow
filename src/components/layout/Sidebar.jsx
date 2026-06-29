@@ -4,6 +4,7 @@ import Badge from '../ui/Badge.jsx'
 const navigation = [
   { label: 'Overview', to: '/', end: true },
   { label: 'Vehicles & Drivers', to: '/vehicles-drivers' },
+  { label: 'Customers, Routes & Trips', to: '/customers-routes-trips' },
   { label: 'Design System', to: '/design-system' },
 ]
 
@@ -14,7 +15,7 @@ export default function Sidebar() {
         <div className="brand-mark">TF</div>
         <div>
           <p className="brand-name">TransportFlow AI</p>
-          <p className="brand-caption">Milestone 2 workspace</p>
+          <p className="brand-caption">Milestone 3 workspace</p>
         </div>
       </div>
 
@@ -27,8 +28,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-note">
-        <Badge tone="info">Milestone 2</Badge>
-        <p>Authentication plus vehicle and driver management only.</p>
+        <Badge tone="info">Milestone 3</Badge>
+        <p>Authentication, vehicles, drivers, customers, routes, and trips.</p>
       </div>
     </aside>
   )

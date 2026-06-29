@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import AppShell from './components/layout/AppShell.jsx'
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import CustomerRouteTripManagement from './pages/CustomerRouteTripManagement.jsx'
 import DesignSystem from './pages/DesignSystem.jsx'
 import Login from './pages/Login.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedPage><Overview /></ProtectedPage>} />
           <Route path="/vehicles-drivers" element={<ProtectedPage><VehicleDriverManagement /></ProtectedPage>} />
+          <Route path="/customers-routes-trips" element={<ProtectedPage><CustomerRouteTripManagement /></ProtectedPage>} />
           <Route path="/design-system" element={<ProtectedPage><DesignSystem /></ProtectedPage>} />
           <Route path="*" element={<ProtectedPage><NotFound /></ProtectedPage>} />
         </Routes>
