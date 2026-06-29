@@ -1,40 +1,60 @@
-import { useMemo, useState } from 'react'
+import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import { useEffect, useMemo, useState } from 'react'
+import { firebaseAuth } from '../firebase.js'
 import AuthContext from './authContext.js'
-import { demoCredentials, demoUser } from '../data/vehicleDriverData.js'
-
-const storageKey = 'transportflow-demo-user'
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem(storageKey)
-    return storedUser ? JSON.parse(storedUser) : null
-  })
+  const [user, setUser] = useState(null)
+  const [isAuthReady, setIsAuthReady] = useState(false)
 
-  const login = ({ email, password }) => {
-    const isValidLogin = email === demoCredentials.email && password === demoCredentials.password
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      setUser(firebaseUser)
+      setIsAuthReady(true)
+    })
 
-    if (!isValidLogin) {
-      return { ok: false, message: 'Use the demo credentials shown on this page.' }
+    return unsubscribe
+  }, [])
+
+  const login = async ({ email, password }) => {
+    try {
+      await signInWithEmailAndPassword(firebaseAuth, email, password)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Firebase sign in failed.' }
     }
-
-    localStorage.setItem(storageKey, JSON.stringify(demoUser))
-    setUser(demoUser)
-    return { ok: true }
   }
 
-  const logout = () => {
-    localStorage.removeItem(storageKey)
-    setUser(null)
+  const signup = async ({ email, password }) => {
+    try {
+      await createUserWithEmailAndPassword(firebaseAuth, email, password)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Firebase sign up failed.' }
+    }
+  }
+
+  const logout = () => signOut(firebaseAuth)
+
+  const getAuthToken = async () => {
+    if (!firebaseAuth.currentUser) {
+      throw new Error('User is not authenticated')
+    }
+
+    return firebaseAuth.currentUser.getIdToken()
   }
 
   const value = useMemo(
     () => ({
       user,
+      isAuthReady,
       isAuthenticated: Boolean(user),
       login,
+      signup,
       logout,
+      getAuthToken,
     }),
-    [user],
+    [user, isAuthReady],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

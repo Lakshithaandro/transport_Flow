@@ -7,10 +7,18 @@ const statusToneMap = {
   Completed: 'success',
   Delayed: 'warning',
   Draft: 'neutral',
+  Flagged: 'danger',
+  High: 'warning',
   Inactive: 'neutral',
+  'In Progress': 'warning',
   'In Transit': 'info',
+  Low: 'neutral',
   Maintenance: 'warning',
+  Medium: 'info',
   'Needs Review': 'warning',
+  Overdue: 'danger',
+  Pending: 'warning',
+  Reconciled: 'success',
   Scheduled: 'info',
 }
 
