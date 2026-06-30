@@ -9,7 +9,7 @@ export async function connectDb() {
   }
 
   mongoose.set('strictQuery', true)
-  console.log('Connecting to MongoDB...', process.env.MONGODB_URI)
+  console.log('Connecting to MongoDB...')
   await mongoose.connect(process.env.MONGODB_URI)
   console.log('MongoDB connected')
 }

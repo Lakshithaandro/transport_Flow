@@ -6,6 +6,7 @@ const navigation = [
   { label: 'Vehicles & Drivers', to: '/vehicles-drivers' },
   { label: 'Customers, Routes & Trips', to: '/customers-routes-trips' },
   { label: 'Fuel & Maintenance', to: '/fuel-maintenance' },
+  { label: 'Invoices & Payments', to: '/invoices-payments' },
   { label: 'Design System', to: '/design-system' },
 ]
 
@@ -16,7 +17,7 @@ export default function Sidebar() {
         <div className="brand-mark">TF</div>
         <div>
           <p className="brand-name">TransportFlow AI</p>
-          <p className="brand-caption">Milestone 4 workspace</p>
+          <p className="brand-caption">Milestone 5 workspace</p>
         </div>
       </div>
 
@@ -29,8 +30,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-note">
-        <Badge tone="info">Milestone 4</Badge>
-        <p>Fuel and maintenance management now uses protected backend APIs.</p>
+        <Badge tone="info">Milestone 5</Badge>
+        <p>Invoice and payment management now uses protected backend APIs.</p>
       </div>
     </aside>
   )

@@ -1,18 +1,29 @@
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { connectDb } from './config/db.js'
 import { requireAuth } from './middleware/auth.js'
 import fuelLogsRouter from './routes/fuelLogs.routes.js'
+import invoicesRouter from './routes/invoices.routes.js'
 import maintenanceRouter from './routes/maintenance.routes.js'
 import summaryRouter from './routes/summary.routes.js'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+dotenv.config({ path: path.join(__dirname, '.env') })
+dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
 const app = express()
 const port = process.env.PORT || 5000
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }))
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
 app.get('/api/health', (req, res) => {
@@ -22,6 +33,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/fuel-logs', requireAuth, fuelLogsRouter)
 app.use('/api/maintenance', requireAuth, maintenanceRouter)
 app.use('/api/fuel-maintenance', requireAuth, summaryRouter)
+app.use('/api/invoices', requireAuth, invoicesRouter)
 
 app.use((req, res) => {
   res.status(404).json({ message: 'API route not found' })

@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { useEffect, useMemo, useState } from 'react'
 import { firebaseAuth } from '../firebase.js'
 import AuthContext from './authContext.js'
@@ -34,6 +34,15 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const resetPassword = async ({ email }) => {
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Firebase password reset failed.' }
+    }
+  }
+
   const logout = () => signOut(firebaseAuth)
 
   const getAuthToken = async () => {
@@ -51,6 +60,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       login,
       signup,
+      resetPassword,
       logout,
       getAuthToken,
     }),

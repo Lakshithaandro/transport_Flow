@@ -9,6 +9,7 @@ import Toolbar from '../components/ui/Toolbar.jsx'
 import useAuth from '../context/useAuth.js'
 import { initialDrivers, initialVehicles } from '../data/vehicleDriverData.js'
 import { fuelMaintenanceApi } from '../services/fuelMaintenanceApi.js'
+import { isAfterDate, isBeforeToday, todayDateInputValue } from '../utils/date.js'
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -71,6 +72,7 @@ export default function FuelMaintenanceManagement() {
   const [maintenanceStatusFilter, setMaintenanceStatusFilter] = useState('All')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const today = todayDateInputValue()
 
   const loadFuelMaintenanceData = async () => {
     setIsLoading(true)
@@ -112,6 +114,11 @@ export default function FuelMaintenanceManagement() {
     event.preventDefault()
     setError('')
 
+    if (isBeforeToday(fuelForm.date)) {
+      setError('Fuel log date cannot be in the past.')
+      return
+    }
+
     const payload = {
       ...fuelForm,
       fuelQuantity: Number(fuelForm.fuelQuantity),
@@ -138,6 +145,21 @@ export default function FuelMaintenanceManagement() {
   const submitMaintenanceRecord = async (event) => {
     event.preventDefault()
     setError('')
+
+    if (isBeforeToday(maintenanceForm.nextServiceDate)) {
+      setError('Next service date cannot be in the past.')
+      return
+    }
+
+    if (isBeforeToday(maintenanceForm.reminderDate)) {
+      setError('Reminder date cannot be in the past.')
+      return
+    }
+
+    if (isAfterDate(maintenanceForm.reminderDate, maintenanceForm.nextServiceDate)) {
+      setError('Reminder date cannot be after the next service date.')
+      return
+    }
 
     const payload = {
       ...maintenanceForm,
@@ -347,7 +369,7 @@ export default function FuelMaintenanceManagement() {
               <input className="form-control" type="number" value={fuelForm.odometerReading} onChange={(event) => setFuelForm({ ...fuelForm, odometerReading: event.target.value })} />
             </Field>
             <Field label="Date">
-              <input className="form-control" type="date" value={fuelForm.date} onChange={(event) => setFuelForm({ ...fuelForm, date: event.target.value })} />
+              <input className="form-control" type="date" min={today} value={fuelForm.date} onChange={(event) => setFuelForm({ ...fuelForm, date: event.target.value })} />
             </Field>
             <Field label="Notes">
               <textarea className="form-control textarea-control" rows="3" value={fuelForm.notes} onChange={(event) => setFuelForm({ ...fuelForm, notes: event.target.value })} />
@@ -400,7 +422,7 @@ export default function FuelMaintenanceManagement() {
               <input className="form-control" value={maintenanceForm.serviceType} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, serviceType: event.target.value })} />
             </Field>
             <Field label="Next Service Date">
-              <input className="form-control" type="date" value={maintenanceForm.nextServiceDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, nextServiceDate: event.target.value })} />
+              <input className="form-control" type="date" min={today} value={maintenanceForm.nextServiceDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, nextServiceDate: event.target.value })} />
             </Field>
             <Field label="Cost">
               <input className="form-control" type="number" step="0.01" value={maintenanceForm.cost} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, cost: event.target.value })} />
@@ -414,7 +436,7 @@ export default function FuelMaintenanceManagement() {
               </select>
             </Field>
             <Field label="Reminder Date">
-              <input className="form-control" type="date" value={maintenanceForm.reminderDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, reminderDate: event.target.value })} />
+              <input className="form-control" type="date" min={today} value={maintenanceForm.reminderDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, reminderDate: event.target.value })} />
             </Field>
             <Field label="Notes">
               <textarea className="form-control textarea-control" rows="3" value={maintenanceForm.notes} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, notes: event.target.value })} />

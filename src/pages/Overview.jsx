@@ -12,7 +12,7 @@ const milestoneAreas = [
   },
   {
     title: 'Firebase authentication',
-    text: 'Protected frontend routes now use Firebase Auth, and Milestone 4 APIs verify Firebase ID tokens.',
+    text: 'Protected frontend routes and backend APIs use Firebase Authentication.',
   },
   {
     title: 'Vehicle and driver management',
@@ -26,6 +26,10 @@ const milestoneAreas = [
     title: 'Fuel and maintenance management',
     text: 'Fuel logs and maintenance records are managed through protected REST APIs backed by MongoDB Atlas.',
   },
+  {
+    title: 'Invoice and payment management',
+    text: 'Invoices, payment statuses, revenue dashboard cards, and PDF export are handled in Milestone 5.',
+  },
 ]
 
 export default function Overview() {
@@ -37,17 +41,18 @@ export default function Overview() {
     <div className="page-stack">
       <section className="hero-panel">
         <div>
-          <Badge tone="info">Milestone 4 fullstack scope</Badge>
-          <h2>Fuel and maintenance management with protected backend APIs.</h2>
+          <Badge tone="info">Milestone 5 fullstack scope</Badge>
+          <h2>Invoice and payment management with PDF export.</h2>
           <p>
-            TransportFlow AI now adds a fullstack Milestone 4 module for fuel logs and
-            maintenance records using Firebase Auth, REST APIs, Zod validation, and MongoDB Atlas.
+            TransportFlow AI now adds Milestone 5 invoice CRUD, payment tracking,
+            revenue dashboard cards, generated invoice numbers, and PDF export through
+            protected backend APIs.
           </p>
         </div>
         <div className="hero-card">
           <p className="eyebrow">Current scope</p>
-          <strong>Fuel & Maintenance Management</strong>
-          <span>No invoices, reports, AI, or unrelated workflow modules were added.</span>
+          <strong>Invoice & Payment Management</strong>
+          <span>No reports, AI, payment gateway, or unrelated workflow modules were added.</span>
         </div>
       </section>
 
@@ -85,6 +90,13 @@ export default function Overview() {
           <p>Open the fullstack Milestone 4 module backed by Firebase Auth, REST APIs, and MongoDB Atlas.</p>
           <Link className="button button-primary button-small" to="/fuel-maintenance">
             Open Fuel & Maintenance
+          </Link>
+        </Card>
+
+        <Card eyebrow="Milestone 5 module" title="Invoice & Payment Management">
+          <p>Open the fullstack Milestone 5 module for invoices, payment status, revenue cards, and PDF export.</p>
+          <Link className="button button-primary button-small" to="/invoices-payments">
+            Open Invoices & Payments
           </Link>
         </Card>
       </section>

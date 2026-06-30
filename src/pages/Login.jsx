@@ -10,15 +10,18 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { login, signup } = useAuth()
+  const { login, signup, resetPassword } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const isSignup = mode === 'signup'
+  const isForgot = mode === 'forgot'
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
+    setMessage('')
 
     if (isSignup && password !== confirmPassword) {
       setError('Passwords do not match.')
@@ -26,20 +29,29 @@ export default function Login() {
     }
 
     setIsSubmitting(true)
-    const result = isSignup ? await signup({ email, password }) : await login({ email, password })
+    const result = isForgot ? await resetPassword({ email }) : isSignup ? await signup({ email, password }) : await login({ email, password })
     setIsSubmitting(false)
 
-    if (!result.ok) {
+    if (!result.ok && !isForgot) {
       setError(result.message)
+      return
+    }
+
+    if (isForgot) {
+      setMessage('If an account exists for this email, a password reset link has been sent.')
+      setPassword('')
+      setConfirmPassword('')
       return
     }
 
     navigate(location.state?.from || '/', { replace: true })
   }
 
-  const switchMode = () => {
-    setMode(isSignup ? 'signin' : 'signup')
+  const switchMode = (nextMode = isSignup ? 'signin' : 'signup') => {
+    setMode(nextMode)
     setError('')
+    setMessage('')
+    setPassword('')
     setConfirmPassword('')
   }
 
@@ -56,11 +68,19 @@ export default function Login() {
 
         <div>
           <Badge tone="info">Firebase Auth</Badge>
-          <h1>{isSignup ? 'Create your TransportFlow account.' : 'Sign in to manage fuel and maintenance operations.'}</h1>
+          <h1>
+            {isForgot
+              ? 'Reset your TransportFlow password.'
+              : isSignup
+                ? 'Create your TransportFlow account.'
+                : 'Sign in to manage fuel, maintenance, and invoice operations.'}
+          </h1>
           <p>
-            {isSignup
-              ? 'Sign up with Firebase Authentication. After signup, your account can access protected TransportFlow pages.'
-              : 'Use your Firebase Authentication account. The frontend sends Firebase ID tokens to the Milestone 4 REST API.'}
+            {isForgot
+              ? 'Enter your Firebase Authentication email and we will send a secure password reset link.'
+              : isSignup
+                ? 'Sign up with Firebase Authentication. After signup, your account can access protected TransportFlow pages.'
+                : 'Use your Firebase Authentication account. The frontend sends Firebase ID tokens to the protected REST API.'}
           </p>
         </div>
 
@@ -68,16 +88,18 @@ export default function Login() {
           <Field label="Email">
             <input className="form-control" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           </Field>
-          <Field label="Password">
-            <input
-              className="form-control"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength="6"
-            />
-          </Field>
+          {!isForgot ? (
+            <Field label="Password">
+              <input
+                className="form-control"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength="6"
+              />
+            </Field>
+          ) : null}
           {isSignup ? (
             <Field label="Confirm Password">
               <input
@@ -91,21 +113,31 @@ export default function Login() {
             </Field>
           ) : null}
           {error ? <p className="auth-error">{error}</p> : null}
+          {message ? <p className="auth-success">{message}</p> : null}
           <button className="button button-primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Please wait...' : isSignup ? 'Create account' : 'Sign in'}
+            {isSubmitting ? 'Please wait...' : isForgot ? 'Send reset link' : isSignup ? 'Create account' : 'Sign in'}
           </button>
         </form>
 
         <div className="auth-hint">
-          <strong>{isSignup ? 'Already have an account?' : 'Need an account?'}</strong>
+          <strong>{isForgot ? 'Remembered your password?' : isSignup ? 'Already have an account?' : 'Need an account?'}</strong>
           <span>
-            {isSignup
-              ? 'Switch back to sign in if your Firebase user already exists.'
-              : 'Create a Firebase Auth user directly from this screen.'}
+            {isForgot
+              ? 'Go back to sign in after resetting your Firebase password.'
+              : isSignup
+                ? 'Switch back to sign in if your Firebase user already exists.'
+                : 'Create a Firebase Auth user directly from this screen.'}
           </span>
-          <button className="button button-secondary button-small" type="button" onClick={switchMode}>
-            {isSignup ? 'Go to sign in' : 'Create new account'}
-          </button>
+          <div className="inline-group">
+            <button className="button button-secondary button-small" type="button" onClick={() => switchMode(isForgot || isSignup ? 'signin' : 'signup')}>
+              {isForgot || isSignup ? 'Go to sign in' : 'Create new account'}
+            </button>
+            {!isForgot && !isSignup ? (
+              <button className="button button-secondary button-small" type="button" onClick={() => switchMode('forgot')}>
+                Forgot password?
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
     </main>

@@ -9,7 +9,10 @@ export async function requireAuth(req, res, next) {
       return res.status(401).json({ message: 'Missing Firebase auth token' })
     }
 
-    const decodedToken = await getFirebaseAdmin().auth().verifyIdToken(token)
+    const auth = getFirebaseAdmin()
+    const decodedToken = await auth.verifyIdToken(token)
+
+    // const decodedToken = await getFirebaseAdmin().auth().verifyIdToken(token)
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email || '',

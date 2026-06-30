@@ -615,6 +615,12 @@ p {
   font-weight: 800;
 }
 
+.auth-success {
+  margin: 0;
+  color: var(--color-success);
+  font-weight: 800;
+}
+
 .auth-hint {
   padding: 1rem;
   border-radius: var(--radius-md);

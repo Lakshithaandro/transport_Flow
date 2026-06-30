@@ -7,6 +7,7 @@ import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
 import { initialCustomers, initialRoutes, initialTrips } from '../data/customerRouteTripData.js'
+import { isBeforeToday, todayDateInputValue } from '../utils/date.js'
 
 const customerStatusOptions = ['All', 'Active', 'Inactive', 'Needs Review']
 const routeStatusOptions = ['All', 'Active', 'Draft', 'Needs Review']
@@ -26,6 +27,8 @@ export default function CustomerRouteTripManagement() {
   const [customerStatus, setCustomerStatus] = useState('All')
   const [routeStatus, setRouteStatus] = useState('All')
   const [tripStatus, setTripStatus] = useState('All')
+  const [tripError, setTripError] = useState('')
+  const today = todayDateInputValue()
   const [customerForm, setCustomerForm] = useState({
     company: '',
     contactName: '',
@@ -108,8 +111,14 @@ export default function CustomerRouteTripManagement() {
 
   const addTrip = (event) => {
     event.preventDefault()
+    setTripError('')
 
     if (!tripForm.customer || !tripForm.route || !tripForm.scheduledDate) return
+
+    if (isBeforeToday(tripForm.scheduledDate)) {
+      setTripError('Scheduled date cannot be in the past.')
+      return
+    }
 
     setTrips((currentTrips) => [
       ...currentTrips,
@@ -414,10 +423,12 @@ export default function CustomerRouteTripManagement() {
               <input
                 className="form-control"
                 type="date"
+                min={today}
                 value={tripForm.scheduledDate}
                 onChange={(event) => setTripForm({ ...tripForm, scheduledDate: event.target.value })}
               />
             </Field>
+            {tripError ? <p className="auth-error">{tripError}</p> : null}
             <Field label="Status">
               <select
                 className="form-control"

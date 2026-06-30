@@ -17,6 +17,8 @@ const statusToneMap = {
   Medium: 'info',
   'Needs Review': 'warning',
   Overdue: 'danger',
+  Paid: 'success',
+  Partial: 'info',
   Pending: 'warning',
   Reconciled: 'success',
   Scheduled: 'info',
