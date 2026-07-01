@@ -1,66 +1,44 @@
-# TransportFlow AI Frontend
+# TransportFlow AI
 
-React frontend and backend setup for the TransportFlow AI PRD.
+TransportFlow AI is a logistics operations dashboard for managing fleet records, customers, routes, trips, fuel logs, maintenance work, invoices, reports, and an AI-powered logistics assistant.
 
-## Scope
+The application combines a React/Vite frontend with an Express/MongoDB backend, Firebase authentication, protected REST APIs, analytics services, and a backend-only Anthropic integration for grounded AI operations analysis.
 
-This project currently covers:
+## Features
 
-### Milestone 1: UI/UX Design & Setup
+- Firebase authentication with protected application routes.
+- Fleet and driver management.
+- Customer, route, and trip management.
+- Fuel log and maintenance record CRUD with MongoDB persistence.
+- Invoice and payment management with backend-generated invoice numbers and PDF export.
+- Reports and analytics for revenue, fuel, maintenance, fleet, driver, route, and operational KPIs.
+- AI Operations Assistant for:
+  - route optimization and route comparison
+  - abnormal fuel usage review
+  - fuel cost reduction recommendations
+  - fleet health and maintenance risk prediction
+  - revenue, invoice, customer, route, driver, vehicle, fuel, and maintenance questions
+- Light and dark theme support.
 
-- Vite + React frontend setup
-- React Router app shell
-- TransportFlow AI visual foundation
-- Overview page
-- Design-system reference page
-- Reusable layout and UI components
-- Plain CSS theme and responsive layout
+## Architecture
 
-### Milestone 2: Authentication, Vehicle & Driver Management - $1,000
+```txt
+React + Vite frontend
+  ├─ Firebase web authentication
+  ├─ Protected routes and app shell
+  ├─ TransportFlow UI components
+  ├─ API services using Firebase bearer tokens
+  └─ AI Assistant interface
 
-- Protected app routes
-- Vehicle management page
-- Driver management page
-- Local React state for search, filtering, and adding vehicle/driver records
+Express backend
+  ├─ Firebase Admin authentication middleware
+  ├─ MongoDB Atlas persistence with Mongoose
+  ├─ Zod request validation
+  ├─ Fuel, maintenance, invoice, analytics, and AI routes
+  └─ Anthropic SDK integration for backend-only AI calls
+```
 
-### Milestone 3: Customer, Route & Trip Management
-
-- Customer management page section
-- Route management page section
-- Trip management page section
-- Local React state for search, filtering, and adding customer/route/trip records
-
-### Milestone 4: Fuel & Maintenance Management
-
-- Firebase Authentication for protected frontend and backend API requests
-- Firebase password reset from the login screen
-- Express REST API backend
-- MongoDB Atlas persistence with Mongoose
-- Zod validation for create/update requests, including no-past-date rules
-- Fuel Log CRUD
-- Maintenance CRUD
-- Dashboard cards powered by backend summary API
-
-### Milestone 5: Invoice & Payment Management
-
-- Invoice CRUD
-- Backend-generated invoice numbers
-- Invoice PDF export
-- Customer, trip, and vehicle selection
-- Tax, discount, and GST calculation
-- Paid, Pending, and Partial payment statuses
-- Revenue dashboard cards
-- MongoDB invoice model
-- Zod validation for invoice create/update requests, including no-past-date rules
-
-Not included:
-
-- Reports module
-- AI features
-- Payment gateway integration
-- Load management
-- Dispatch workflow
-- Unrelated backend modules
+AI requests are handled on the backend so Anthropic credentials are never exposed to the browser. Assistant answers are grounded in the authenticated user's available TransportFlow analytics payload.
 
 ## Getting started
 
@@ -77,7 +55,7 @@ cp .env.example .env
 cp server/.env.example server/.env
 ```
 
-Fill in Firebase and MongoDB Atlas values in `.env` and `server/.env`.
+Fill in Firebase, MongoDB Atlas, and Anthropic values in `.env` and `server/.env`.
 
 Frontend `.env` requires:
 
@@ -100,9 +78,12 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/transportflow
 FIREBASE_PROJECT_ID=your-project-id
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk@example.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
+ANTHROPIC_API_KEY=your-backend-only-anthropic-api-key
 ```
 
 `CLIENT_ORIGIN` can contain comma-separated frontend URLs for local, staging, and production. The Firebase web config in `.env` and Firebase Admin service account in `server/.env` must use the same Firebase project, otherwise protected API requests will return 401.
+
+If `ANTHROPIC_API_KEY` is not configured, the Assistant route still returns a safe fallback response based on rule-based analytics, but natural-language AI analysis requires the key.
 
 Run the backend:
 
@@ -134,26 +115,26 @@ npm run preview
 npm run lint
 ```
 
-## Routes
+## Application routes
 
-- `/login` — Firebase Auth login, sign-up, and forgot-password page
-- `/` — Protected overview page
-- `/vehicles-drivers` — Protected vehicle and driver management page
-- `/customers-routes-trips` — Protected customer, route, and trip management page
-- `/fuel-maintenance` — Protected fuel and maintenance management page
-- `/invoices-payments` — Protected invoice and payment management page
-- `/design-system` — Protected UI foundation/reference page
-- `*` — Static not-found page
+- `/login` — Firebase Auth login, sign-up, and forgot-password page.
+- `/vehicles-drivers` — Protected fleet and driver management page.
+- `/customers-routes-trips` — Protected customer, route, and trip management page.
+- `/fuel-maintenance` — Protected fuel and maintenance management page.
+- `/invoices-payments` — Protected invoice and payment management page.
+- `/reports-analytics` — Protected reports and analytics page.
+- `/logistics-assistant` — Protected AI Operations Assistant page.
+- `*` — Not-found page.
 
-## API List
+## API endpoints
 
-All backend APIs require a Firebase ID token:
+All protected backend APIs require a Firebase ID token:
 
 ```txt
 Authorization: Bearer <Firebase ID token>
 ```
 
-### Fuel Logs
+### Fuel logs
 
 - `GET /api/fuel-logs`
 - `POST /api/fuel-logs`
@@ -167,7 +148,7 @@ Authorization: Bearer <Firebase ID token>
 - `PATCH /api/maintenance/:id`
 - `DELETE /api/maintenance/:id`
 
-### Fuel & Maintenance Dashboard Summary
+### Fuel and maintenance summary
 
 - `GET /api/fuel-maintenance/summary`
 
@@ -181,6 +162,37 @@ Authorization: Bearer <Firebase ID token>
 - `PATCH /api/invoices/:id`
 - `DELETE /api/invoices/:id`
 
-## Milestone 5 note
+### Reports and analytics
 
-Invoice records are stored in MongoDB Atlas and protected by Firebase Auth. The invoice page consumes backend APIs for CRUD and revenue dashboard data. PDF export is generated on the frontend from saved invoice data. Reports and AI features are intentionally not implemented.
+- `GET /api/analytics/reports`
+- `GET /api/analytics/route-optimization`
+- `GET /api/analytics/ai-insights`
+
+### AI Assistant
+
+- `GET /api/ai/status`
+- `POST /api/ai/assistant`
+
+Request body for `POST /api/ai/assistant`:
+
+```json
+{
+  "question": "Which vehicles need maintenance this week?"
+}
+```
+
+The Assistant API builds an authenticated analytics context and uses Claude through the official Anthropic SDK on the backend.
+
+## AI Assistant behavior
+
+The AI Operations Assistant is designed to answer natural-language logistics questions using available TransportFlow data. It can analyze route efficiency, fuel usage, fleet health, maintenance risk, invoices, revenue, customers, drivers, vehicles, and operational performance.
+
+The frontend only calls the AI endpoint when the user clicks **Ask Assistant** or submits the assistant form. Suggested prompts only populate the input field.
+
+Assistant responses support summaries, bullet lists, tables, recommendations, warnings, metrics, and grounding metadata.
+
+## Future integrations
+
+The current implementation uses TransportFlow records and analytics already available to the application. Future integrations may add live map routing, toll-provider pricing, GPS/ELD/telematics streams, fuel-card feeds, payment gateway capture, or dispatch mutation workflows.
+
+Until those integrations exist, the Assistant should treat those areas as unavailable external data sources and provide grounded recommendations from current records only.

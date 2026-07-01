@@ -5,6 +5,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectDb } from './config/db.js'
 import { requireAuth } from './middleware/auth.js'
+import aiRouter from './routes/ai.routes.js'
+import analyticsRouter from './routes/analytics.routes.js'
 import fuelLogsRouter from './routes/fuelLogs.routes.js'
 import invoicesRouter from './routes/invoices.routes.js'
 import maintenanceRouter from './routes/maintenance.routes.js'
@@ -34,6 +36,8 @@ app.use('/api/fuel-logs', requireAuth, fuelLogsRouter)
 app.use('/api/maintenance', requireAuth, maintenanceRouter)
 app.use('/api/fuel-maintenance', requireAuth, summaryRouter)
 app.use('/api/invoices', requireAuth, invoicesRouter)
+app.use('/api/analytics', requireAuth, analyticsRouter)
+app.use('/api/ai', requireAuth, aiRouter)
 
 app.use((req, res) => {
   res.status(404).json({ message: 'API route not found' })

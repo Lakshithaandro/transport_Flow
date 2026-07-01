@@ -112,15 +112,15 @@ export default function VehicleDriverManagement() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Milestone 2"
-        title="Vehicle & Driver Management"
-        description="Manage demo vehicles and drivers with local frontend state. Authentication protects this workspace."
+        eyebrow="Fleet Operations"
+        title="Vehicles & Drivers"
+        description="Manage fleet availability, driver readiness, and asset assignments."
       />
 
       <section className="stat-grid" aria-label="Vehicle and driver summary">
-        <StatCard label="Vehicles" value={vehicles.length} helper="Mock vehicle records" tone="info" />
-        <StatCard label="Available vehicles" value={availableVehicles} helper="Ready for use" tone="success" />
-        <StatCard label="Drivers" value={drivers.length} helper="Mock driver records" tone="info" />
+        <StatCard label="Vehicles" value={vehicles.length} helper="Fleet records" tone="info" />
+        <StatCard label="Available vehicles" value={availableVehicles} helper="Ready for dispatch" tone="success" />
+        <StatCard label="Drivers" value={drivers.length} helper="Driver records" tone="info" />
         <StatCard label="Drivers ready" value={availableDrivers} helper={`${reviewDrivers} need review`} tone="success" />
       </section>
 

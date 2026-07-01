@@ -303,40 +303,25 @@ export default function FuelMaintenanceManagement() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Milestone 4"
-        title="Fuel & Maintenance Management"
-        description="Manage fuel logs and maintenance records through Firebase-protected REST APIs backed by MongoDB Atlas."
+        eyebrow="Asset Health"
+        title="Fuel & Maintenance"
+        description="Track fuel spend, service activity, and maintenance readiness."
       />
 
       {error ? <p className="auth-error">{error}</p> : null}
-      {isLoading ? <Card title="Loading records"><p>Fetching fuel and maintenance records from the backend API.</p></Card> : null}
+      {isLoading ? <Card title="Loading records"><p>Preparing fuel and maintenance records.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Fuel and maintenance summary">
-        <StatCard label="Total Fuel Cost" value={currencyFormatter.format(summary.totalFuelCost)} helper="From backend summary API" tone="info" />
+        <StatCard label="Total Fuel Cost" value={currencyFormatter.format(summary.totalFuelCost)} helper="Recorded fuel spend" tone="info" />
         <StatCard label="Average Mileage" value={Number(summary.averageMileage).toLocaleString()} helper="Average odometer reading" tone="success" />
         <StatCard label="Vehicles Due" value={summary.vehiclesDueForService} helper="Scheduled or overdue service" tone="warning" />
-        <StatCard label="Maintenance Cost" value={currencyFormatter.format(summary.totalMaintenanceCost)} helper="Total recorded cost" tone="neutral" />
+        <StatCard label="Maintenance Cost" value={currencyFormatter.format(summary.totalMaintenanceCost)} helper="Total service cost" tone="neutral" />
       </section>
 
-      <section className="split-layout split-layout-wide">
-        <Card className="table-shell" eyebrow="Fuel module" title="Fuel log CRUD">
-          <Toolbar>
-            <Field label="Search fuel logs">
-              <input
-                className="form-control"
-                type="search"
-                value={fuelQuery}
-                onChange={(event) => setFuelQuery(event.target.value)}
-                placeholder="Search vehicle, driver, station..."
-              />
-            </Field>
-          </Toolbar>
-          <DataTable columns={fuelColumns} rows={filteredFuelLogs} getRowKey={getRecordId} />
-        </Card>
-
-        <Card eyebrow={editingFuelId ? 'Edit fuel log' : 'Add fuel log'} title="Fuel entry form">
+      <section className="content-grid">
+        <Card eyebrow={editingFuelId ? 'Edit fuel log' : 'Fuel entry'} title={editingFuelId ? 'Update fuel log' : 'Add fuel log'}>
           <form className="form-grid form-grid-single" onSubmit={submitFuelLog}>
-            <Field label="Vehicle Selection">
+            <Field label="Vehicle">
               <select
                 className="form-control"
                 value={fuelForm.vehicleId}
@@ -348,7 +333,7 @@ export default function FuelMaintenanceManagement() {
                 ))}
               </select>
             </Field>
-            <Field label="Driver Selection">
+            <Field label="Driver">
               <select className="form-control" value={fuelForm.driverId} onChange={(event) => handleDriverSelection(event.target.value)}>
                 <option value="">Select driver</option>
                 {initialDrivers.map((driver) => (
@@ -356,16 +341,16 @@ export default function FuelMaintenanceManagement() {
                 ))}
               </select>
             </Field>
-            <Field label="Fuel Quantity">
+            <Field label="Fuel quantity">
               <input className="form-control" type="number" step="0.01" value={fuelForm.fuelQuantity} onChange={(event) => setFuelForm({ ...fuelForm, fuelQuantity: event.target.value })} />
             </Field>
-            <Field label="Fuel Cost">
+            <Field label="Fuel cost">
               <input className="form-control" type="number" step="0.01" value={fuelForm.fuelCost} onChange={(event) => setFuelForm({ ...fuelForm, fuelCost: event.target.value })} />
             </Field>
-            <Field label="Fuel Station">
+            <Field label="Fuel station">
               <input className="form-control" value={fuelForm.fuelStation} onChange={(event) => setFuelForm({ ...fuelForm, fuelStation: event.target.value })} />
             </Field>
-            <Field label="Odometer Reading">
+            <Field label="Odometer reading">
               <input className="form-control" type="number" value={fuelForm.odometerReading} onChange={(event) => setFuelForm({ ...fuelForm, odometerReading: event.target.value })} />
             </Field>
             <Field label="Date">
@@ -380,10 +365,69 @@ export default function FuelMaintenanceManagement() {
             </div>
           </form>
         </Card>
+
+        <Card eyebrow={editingMaintenanceId ? 'Edit maintenance' : 'Maintenance entry'} title={editingMaintenanceId ? 'Update maintenance' : 'Add maintenance'}>
+          <form className="form-grid form-grid-single" onSubmit={submitMaintenanceRecord}>
+            <Field label="Vehicle">
+              <select
+                className="form-control"
+                value={maintenanceForm.vehicleId}
+                onChange={(event) => handleVehicleSelection(event.target.value, setMaintenanceForm, maintenanceForm)}
+              >
+                <option value="">Select vehicle</option>
+                {initialVehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>{vehicle.unit}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Service type">
+              <input className="form-control" value={maintenanceForm.serviceType} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, serviceType: event.target.value })} />
+            </Field>
+            <Field label="Next service date">
+              <input className="form-control" type="date" min={today} value={maintenanceForm.nextServiceDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, nextServiceDate: event.target.value })} />
+            </Field>
+            <Field label="Cost">
+              <input className="form-control" type="number" step="0.01" value={maintenanceForm.cost} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, cost: event.target.value })} />
+            </Field>
+            <Field label="Mechanic">
+              <input className="form-control" value={maintenanceForm.mechanicName} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, mechanicName: event.target.value })} />
+            </Field>
+            <Field label="Status">
+              <select className="form-control" value={maintenanceForm.status} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, status: event.target.value })}>
+                {maintenanceStatuses.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </Field>
+            <Field label="Reminder date">
+              <input className="form-control" type="date" min={today} value={maintenanceForm.reminderDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, reminderDate: event.target.value })} />
+            </Field>
+            <Field label="Notes">
+              <textarea className="form-control textarea-control" rows="3" value={maintenanceForm.notes} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, notes: event.target.value })} />
+            </Field>
+            <div className="inline-group">
+              <button className="button button-primary" type="submit">{editingMaintenanceId ? 'Update maintenance' : 'Create maintenance'}</button>
+              {editingMaintenanceId ? <button className="button button-secondary" type="button" onClick={() => { setEditingMaintenanceId(null); setMaintenanceForm(emptyMaintenanceForm) }}>Cancel</button> : null}
+            </div>
+          </form>
+        </Card>
       </section>
 
-      <section className="split-layout split-layout-wide">
-        <Card className="table-shell" eyebrow="Maintenance module" title="Maintenance CRUD">
+      <section className="content-grid">
+        <Card className="table-shell" eyebrow="Fuel logs" title="Fuel records">
+          <Toolbar>
+            <Field label="Search fuel logs">
+              <input
+                className="form-control"
+                type="search"
+                value={fuelQuery}
+                onChange={(event) => setFuelQuery(event.target.value)}
+                placeholder="Search vehicle, driver, station..."
+              />
+            </Field>
+          </Toolbar>
+          <DataTable columns={fuelColumns} rows={filteredFuelLogs} getRowKey={getRecordId} />
+        </Card>
+
+        <Card className="table-shell" eyebrow="Maintenance logs" title="Maintenance records">
           <Toolbar>
             <Field label="Search maintenance">
               <input
@@ -402,50 +446,6 @@ export default function FuelMaintenanceManagement() {
             </Field>
           </Toolbar>
           <DataTable columns={maintenanceColumns} rows={filteredMaintenanceRecords} getRowKey={getRecordId} />
-        </Card>
-
-        <Card eyebrow={editingMaintenanceId ? 'Edit maintenance' : 'Add maintenance'} title="Maintenance form">
-          <form className="form-grid form-grid-single" onSubmit={submitMaintenanceRecord}>
-            <Field label="Vehicle Selection">
-              <select
-                className="form-control"
-                value={maintenanceForm.vehicleId}
-                onChange={(event) => handleVehicleSelection(event.target.value, setMaintenanceForm, maintenanceForm)}
-              >
-                <option value="">Select vehicle</option>
-                {initialVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>{vehicle.unit}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Service Type">
-              <input className="form-control" value={maintenanceForm.serviceType} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, serviceType: event.target.value })} />
-            </Field>
-            <Field label="Next Service Date">
-              <input className="form-control" type="date" min={today} value={maintenanceForm.nextServiceDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, nextServiceDate: event.target.value })} />
-            </Field>
-            <Field label="Cost">
-              <input className="form-control" type="number" step="0.01" value={maintenanceForm.cost} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, cost: event.target.value })} />
-            </Field>
-            <Field label="Mechanic Name">
-              <input className="form-control" value={maintenanceForm.mechanicName} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, mechanicName: event.target.value })} />
-            </Field>
-            <Field label="Status">
-              <select className="form-control" value={maintenanceForm.status} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, status: event.target.value })}>
-                {maintenanceStatuses.map((status) => <option key={status}>{status}</option>)}
-              </select>
-            </Field>
-            <Field label="Reminder Date">
-              <input className="form-control" type="date" min={today} value={maintenanceForm.reminderDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, reminderDate: event.target.value })} />
-            </Field>
-            <Field label="Notes">
-              <textarea className="form-control textarea-control" rows="3" value={maintenanceForm.notes} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, notes: event.target.value })} />
-            </Field>
-            <div className="inline-group">
-              <button className="button button-primary" type="submit">{editingMaintenanceId ? 'Update maintenance' : 'Create maintenance'}</button>
-              {editingMaintenanceId ? <button className="button button-secondary" type="button" onClick={() => { setEditingMaintenanceId(null); setMaintenanceForm(emptyMaintenanceForm) }}>Cancel</button> : null}
-            </div>
-          </form>
         </Card>
       </section>
     </div>

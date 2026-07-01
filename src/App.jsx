@@ -1,14 +1,15 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/layout/AppShell.jsx'
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import CustomerRouteTripManagement from './pages/CustomerRouteTripManagement.jsx'
-import DesignSystem from './pages/DesignSystem.jsx'
 import FuelMaintenanceManagement from './pages/FuelMaintenanceManagement.jsx'
 import InvoicePaymentManagement from './pages/InvoicePaymentManagement.jsx'
+import LogisticsAssistant from './pages/LogisticsAssistant'
 import Login from './pages/Login.jsx'
 import NotFound from './pages/NotFound.jsx'
-import Overview from './pages/Overview.jsx'
+import ReportsAnalytics from './pages/ReportsAnalytics.jsx'
 import VehicleDriverManagement from './pages/VehicleDriverManagement.jsx'
 
 function ProtectedPage({ children }) {
@@ -22,18 +23,21 @@ function ProtectedPage({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedPage><Overview /></ProtectedPage>} />
-          <Route path="/vehicles-drivers" element={<ProtectedPage><VehicleDriverManagement /></ProtectedPage>} />
-          <Route path="/customers-routes-trips" element={<ProtectedPage><CustomerRouteTripManagement /></ProtectedPage>} />
-          <Route path="/fuel-maintenance" element={<ProtectedPage><FuelMaintenanceManagement /></ProtectedPage>} />
-          <Route path="/invoices-payments" element={<ProtectedPage><InvoicePaymentManagement /></ProtectedPage>} />
-          <Route path="/design-system" element={<ProtectedPage><DesignSystem /></ProtectedPage>} />
-          <Route path="*" element={<ProtectedPage><NotFound /></ProtectedPage>} />
-        </Routes>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Navigate to="/vehicles-drivers" replace />} />
+            <Route path="/vehicles-drivers" element={<ProtectedPage><VehicleDriverManagement /></ProtectedPage>} />
+            <Route path="/customers-routes-trips" element={<ProtectedPage><CustomerRouteTripManagement /></ProtectedPage>} />
+            <Route path="/fuel-maintenance" element={<ProtectedPage><FuelMaintenanceManagement /></ProtectedPage>} />
+            <Route path="/invoices-payments" element={<ProtectedPage><InvoicePaymentManagement /></ProtectedPage>} />
+            <Route path="/reports-analytics" element={<ProtectedPage><ReportsAnalytics /></ProtectedPage>} />
+            <Route path="/logistics-assistant" element={<ProtectedPage><LogisticsAssistant /></ProtectedPage>} />
+            <Route path="*" element={<ProtectedPage><NotFound /></ProtectedPage>} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

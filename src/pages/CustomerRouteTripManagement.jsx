@@ -189,16 +189,16 @@ export default function CustomerRouteTripManagement() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Milestone 3"
-        title="Customer, Route & Trip Management"
-        description="Manage demo customer, route, and trip records with local frontend state."
+        eyebrow="Network Planning"
+        title="Customers, Routes & Trips"
+        description="Manage customer accounts, route definitions, and scheduled trips."
       />
 
       <section className="stat-grid" aria-label="Customer route trip summary">
         <StatCard label="Customers" value={customers.length} helper={`${activeCustomers} active`} tone="info" />
         <StatCard label="Routes" value={routes.length} helper={`${activeRoutes} active`} tone="success" />
         <StatCard label="Trips" value={trips.length} helper={`${scheduledTrips} scheduled`} tone="info" />
-        <StatCard label="Data mode" value="Mock" helper="Local state only" tone="neutral" />
+        <StatCard label="Planning" value="Live" helper="Operational workspace" tone="neutral" />
       </section>
 
       <section className="split-layout split-layout-wide">

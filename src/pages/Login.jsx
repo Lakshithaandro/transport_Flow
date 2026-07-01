@@ -44,7 +44,7 @@ export default function Login() {
       return
     }
 
-    navigate(location.state?.from || '/', { replace: true })
+    navigate(location.state?.from || '/vehicles-drivers', { replace: true })
   }
 
   const switchMode = (nextMode = isSignup ? 'signin' : 'signup') => {
@@ -62,25 +62,25 @@ export default function Login() {
           <div className="brand-mark">TF</div>
           <div>
             <p className="brand-name">TransportFlow AI</p>
-            <p className="brand-caption">Firebase authentication</p>
+            <p className="brand-caption">Secure operations access</p>
           </div>
         </div>
 
         <div>
-          <Badge tone="info">Firebase Auth</Badge>
+          <Badge tone="info">Secure access</Badge>
           <h1>
             {isForgot
               ? 'Reset your TransportFlow password.'
               : isSignup
                 ? 'Create your TransportFlow account.'
-                : 'Sign in to manage fuel, maintenance, and invoice operations.'}
+                : 'Sign in to manage transport operations.'}
           </h1>
           <p>
             {isForgot
-              ? 'Enter your Firebase Authentication email and we will send a secure password reset link.'
+              ? 'Enter your account email and we will send a secure password reset link.'
               : isSignup
-                ? 'Sign up with Firebase Authentication. After signup, your account can access protected TransportFlow pages.'
-                : 'Use your Firebase Authentication account. The frontend sends Firebase ID tokens to the protected REST API.'}
+                ? 'Create an account to access the TransportFlow workspace.'
+                : 'Use your account credentials to access protected operations modules.'}
           </p>
         </div>
 
@@ -123,10 +123,10 @@ export default function Login() {
           <strong>{isForgot ? 'Remembered your password?' : isSignup ? 'Already have an account?' : 'Need an account?'}</strong>
           <span>
             {isForgot
-              ? 'Go back to sign in after resetting your Firebase password.'
+              ? 'Go back to sign in after resetting your password.'
               : isSignup
-                ? 'Switch back to sign in if your Firebase user already exists.'
-                : 'Create a Firebase Auth user directly from this screen.'}
+                ? 'Switch back to sign in if your account already exists.'
+                : 'Create an account directly from this screen.'}
           </span>
           <div className="inline-group">
             <button className="button button-secondary button-small" type="button" onClick={() => switchMode(isForgot || isSignup ? 'signin' : 'signup')}>

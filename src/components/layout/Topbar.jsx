@@ -1,20 +1,24 @@
 import useAuth from '../../context/useAuth.js'
-import Badge from '../ui/Badge.jsx'
+import useTheme from '../../context/useTheme.js'
 
 export default function Topbar() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const nextThemeLabel = theme === 'dark' ? 'Light' : 'Dark'
 
   return (
     <header className="topbar">
-      <div>
-        <p className="eyebrow">TransportFlow AI</p>
-        <h1>Operations Management Workspace</h1>
+      <div className="topbar-brand" aria-label="TransportFlow AI">
+        <span className="topbar-logo">TF</span>
+        <span>TransportFlow AI</span>
       </div>
       <div className="topbar-actions">
-        <Badge tone="success">Milestone 4</Badge>
         {user ? <div className="company-chip">{user.displayName || user.email}</div> : null}
-        <button className="button button-secondary button-small" type="button" onClick={logout}>
-          Sign out
+        <button className="button button-secondary button-small" type="button" onClick={toggleTheme} aria-label={`Switch to ${nextThemeLabel.toLowerCase()} mode`}>
+          {nextThemeLabel} mode
+        </button>
+        <button className="button button-primary button-small" type="button" onClick={logout}>
+          Logout
         </button>
       </div>
     </header>

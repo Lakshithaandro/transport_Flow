@@ -305,9 +305,9 @@ export default function InvoicePaymentManagement() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Milestone 5"
-        title="Invoice & Payment Management"
-        description="Create invoices, track payments, calculate tax/GST/discounts, and export professional PDF invoices."
+        eyebrow="Billing"
+        title="Invoices & Payments"
+        description="Create invoices, track balances, manage payment status, and export PDF invoices."
       />
 
       {error ? <p className="auth-error">{error}</p> : null}
@@ -321,7 +321,7 @@ export default function InvoicePaymentManagement() {
       </section>
 
       <section className="split-layout split-layout-wide">
-        <Card className="table-shell" eyebrow="Invoices" title="Invoice CRUD">
+        <Card className="table-shell" eyebrow="Invoices" title="Invoice records">
           <Toolbar>
             <Field label="Search invoices">
               <input className="form-control" type="search" value={invoiceQuery} onChange={(event) => setInvoiceQuery(event.target.value)} placeholder="Search invoice, customer, trip..." />

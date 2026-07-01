@@ -12,7 +12,6 @@ export async function apiRequest(
   // Get Firebase token and attach it to the request
   if (getAuthToken) {
     const token = await getAuthToken()
-    console.log('Firebase Token:', token)
 
     if (token) {
       headers.Authorization = `Bearer ${token}`
