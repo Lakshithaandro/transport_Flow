@@ -1,7 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import Badge from '../ui/Badge.jsx'
 
-const futureNavigation = ['Loads', 'Dispatch', 'Fleet', 'Customers', 'Reports', 'Settings']
+const navigation = [
+  { label: 'Fleet', to: '/vehicles-drivers' },
+  { label: 'Customers & Routes', to: '/customers-routes-trips' },
+  { label: 'Fuel & Maintenance', to: '/fuel-maintenance' },
+  { label: 'Invoices & Payments', to: '/invoices-payments' },
+  { label: 'Reports', to: '/reports-analytics' },
+  { label: 'Assistant', to: '/logistics-assistant' },
+]
 
 export default function Sidebar() {
   return (
@@ -10,28 +16,21 @@ export default function Sidebar() {
         <div className="brand-mark">TF</div>
         <div>
           <p className="brand-name">TransportFlow AI</p>
-          <p className="brand-caption">TMS frontend foundation</p>
+          <p className="brand-caption">Logistics ERP</p>
         </div>
       </div>
 
       <nav className="nav-stack">
-        <NavLink className="nav-link" to="/" end>
-          Overview
-        </NavLink>
-        <NavLink className="nav-link" to="/design-system">
-          Design System
-        </NavLink>
-        {futureNavigation.map((item) => (
-          <span className="nav-link nav-link-disabled" key={item}>
-            {item}
-            <Badge tone="neutral">Soon</Badge>
-          </span>
+        {navigation.map((item) => (
+          <NavLink className="nav-link" to={item.to} key={item.to}>
+            <span>{item.label}</span>
+          </NavLink>
         ))}
       </nav>
 
-      <div className="sidebar-note">
-        <Badge tone="info">Milestone 1</Badge>
-        <p>Static UI/UX setup only. No backend or workflow logic included.</p>
+      <div className="workspace-card">
+        <span className="workspace-label">Workspace</span>
+        <strong>Transport Operations</strong>
       </div>
     </aside>
   )

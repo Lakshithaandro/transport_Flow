@@ -1,0 +1,73 @@
+export const initialVehicles = [
+  {
+    id: 'VEH-101',
+    unit: 'Tractor 101',
+    type: 'Tractor',
+    plate: 'TX-4821',
+    status: 'Available',
+    assignedDriver: 'Unassigned',
+    mileage: 184220,
+  },
+  {
+    id: 'VEH-118',
+    unit: 'Tractor 118',
+    type: 'Tractor',
+    plate: 'GA-7742',
+    status: 'Assigned',
+    assignedDriver: 'Andre Miller',
+    mileage: 221450,
+  },
+  {
+    id: 'VEH-510',
+    unit: 'Trailer 510',
+    type: 'Dry Van Trailer',
+    plate: 'TN-9205',
+    status: 'Available',
+    assignedDriver: 'Unassigned',
+    mileage: 0,
+  },
+  {
+    id: 'VEH-545',
+    unit: 'Trailer 545',
+    type: 'Flatbed Trailer',
+    plate: 'IL-3051',
+    status: 'Maintenance',
+    assignedDriver: 'Unassigned',
+    mileage: 0,
+  },
+]
+
+export const initialDrivers = [
+  {
+    id: 'DRV-001',
+    name: 'Maria Santos',
+    licenseClass: 'Class A CDL',
+    phone: '(555) 011-2401',
+    status: 'Available',
+    assignedVehicle: 'Unassigned',
+  },
+  {
+    id: 'DRV-002',
+    name: 'Ethan Cole',
+    licenseClass: 'Class A CDL',
+    phone: '(555) 011-2402',
+    status: 'Available',
+    assignedVehicle: 'Tractor 101',
+  },
+  {
+    id: 'DRV-003',
+    name: 'Priya Raman',
+    licenseClass: 'Class B CDL',
+    phone: '(555) 011-2403',
+    status: 'Needs Review',
+    assignedVehicle: 'Unassigned',
+  },
+  {
+    id: 'DRV-004',
+    name: 'Andre Miller',
+    licenseClass: 'Class A CDL',
+    phone: '(555) 011-2404',
+    status: 'Assigned',
+    assignedVehicle: 'Tractor 118',
+  },
+]
