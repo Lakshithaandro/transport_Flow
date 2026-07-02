@@ -647,6 +647,13 @@ p {
   color: var(--color-muted);
 }
 
+.password-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .textarea-control {
   resize: vertical;
 }
@@ -1117,6 +1124,32 @@ p {
   align-items: center;
   gap: 0.55rem;
   color: var(--color-muted);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.modal-card {
+  display: grid;
+  gap: 0.8rem;
+  width: min(100%, 440px);
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.modal-card h2 {
+  margin: 0;
+  color: var(--color-text-strong);
 }
 
 .spinner {

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import useAuth from '../../context/useAuth.js'
 
 const navigation = [
   { label: 'Fleet', to: '/vehicles-drivers' },
@@ -10,6 +11,8 @@ const navigation = [
 ]
 
 export default function Sidebar() {
+  const { isAdmin } = useAuth()
+
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="brand-block">
@@ -26,6 +29,11 @@ export default function Sidebar() {
             <span>{item.label}</span>
           </NavLink>
         ))}
+        {isAdmin ? (
+          <NavLink className="nav-link" to="/admin/dashboard">
+            <span>Admin</span>
+          </NavLink>
+        ) : null}
       </nav>
 
       <div className="workspace-card">

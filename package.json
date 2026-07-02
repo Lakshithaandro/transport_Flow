@@ -10,15 +10,19 @@
     "dev:full": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",
     "@vitejs/plugin-react": "latest",
+    "bcryptjs": "^3.0.3",
     "concurrently": "^10.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "firebase": "^12.15.0",
     "firebase-admin": "^12.7.0",
     "jspdf": "^4.2.1",
@@ -26,14 +30,21 @@
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
+    "recharts": "^3.9.1",
     "vite": "latest",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "latest",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
-    "globals": "latest"
+    "globals": "latest",
+    "jsdom": "^29.1.1",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.9"
   }
 }
