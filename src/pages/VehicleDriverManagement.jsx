@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Card from '../components/ui/Card.jsx'
 import ConfirmModal from '../components/ui/ConfirmModal.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
@@ -7,7 +8,8 @@ import PageHeader from '../components/ui/PageHeader.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
-import { initialDrivers, initialVehicles } from '../data/vehicleDriverData.js'
+import useAuth from '../context/useAuth.js'
+import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
 import {
   formatPhone,
   normalizePhone,
@@ -24,24 +26,57 @@ const vehicleTypeOptions = ['Tractor', 'Dry Van Trailer', 'Reefer Trailer', 'Fla
 const vehicleStatusOptions = ['Available', 'Assigned', 'Maintenance']
 const driverLicenseOptions = ['Class A CDL', 'Class B CDL']
 const driverStatusOptions = ['Available', 'Assigned', 'Needs Review']
+const emptyVehicleForm = { unit: '', type: 'Tractor', plate: '', status: 'Available' }
+const emptyDriverForm = { name: '', licenseClass: 'Class A CDL', phone: '', status: 'Available' }
 
-function nextId(prefix, records) {
-  const nextNumber = Math.max(0, ...records.map((record) => Number(String(record.id).replace(`${prefix}-`, '')) || 0)) + 1
-  return `${prefix}-${String(nextNumber).padStart(3, '0')}`
+function getRecordId(record) {
+  return record._id || record.id
 }
 
 export default function VehicleDriverManagement() {
-  const [vehicles, setVehicles] = useState(initialVehicles)
-  const [drivers, setDrivers] = useState(initialDrivers)
+  const { getAuthToken } = useAuth()
+  const [vehicles, setVehicles] = useState([])
+  const [drivers, setDrivers] = useState([])
   const [vehicleQuery, setVehicleQuery] = useState('')
   const [driverQuery, setDriverQuery] = useState('')
   const [vehicleStatus, setVehicleStatus] = useState('All')
   const [driverStatus, setDriverStatus] = useState('All')
   const [vehicleError, setVehicleError] = useState('')
   const [driverError, setDriverError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [vehicleForm, setVehicleForm] = useState({ unit: '', type: 'Tractor', plate: '', status: 'Available' })
-  const [driverForm, setDriverForm] = useState({ name: '', licenseClass: 'Class A CDL', phone: '', status: 'Available' })
+  const [vehicleForm, setVehicleForm] = useState(emptyVehicleForm)
+  const [driverForm, setDriverForm] = useState(emptyDriverForm)
+  const [editingVehicleId, setEditingVehicleId] = useState(null)
+  const [editingDriverId, setEditingDriverId] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isVehicleSaving, setIsVehicleSaving] = useState(false)
+  const [isDriverSaving, setIsDriverSaving] = useState(false)
+
+  const loadFleetRecords = async () => {
+    setIsLoading(true)
+    setLoadError('')
+
+    try {
+      const [vehicleData, driverData] = await Promise.all([
+        vehicleDriverApi.getVehicles(getAuthToken),
+        vehicleDriverApi.getDrivers(getAuthToken),
+      ])
+      setVehicles(vehicleData)
+      setDrivers(driverData)
+    } catch (requestError) {
+      setLoadError(requestError.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadFleetRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filteredVehicles = vehicles.filter((vehicle) => {
     const searchableText = [vehicle.unit, vehicle.type, vehicle.plate, vehicle.assignedDriver].join(' ').toLowerCase()
@@ -59,9 +94,22 @@ export default function VehicleDriverManagement() {
     return matchesQuery && matchesStatus
   })
 
-  const addVehicle = (event) => {
+  const resetVehicleForm = () => {
+    setEditingVehicleId(null)
+    setVehicleForm(emptyVehicleForm)
+    setVehicleError('')
+  }
+
+  const resetDriverForm = () => {
+    setEditingDriverId(null)
+    setDriverForm(emptyDriverForm)
+    setDriverError('')
+  }
+
+  const submitVehicle = async (event) => {
     event.preventDefault()
     setVehicleError('')
+    setSaveMessage('')
 
     const sanitizedForm = trimFormValues(vehicleForm)
     const normalizedPlate = normalizePlate(sanitizedForm.plate)
@@ -78,28 +126,41 @@ export default function VehicleDriverManagement() {
       return
     }
 
-    const plateExists = vehicles.some((vehicle) => normalizePlate(vehicle.plate) === normalizedPlate)
+    const plateExists = vehicles.some(
+      (vehicle) => getRecordId(vehicle) !== editingVehicleId && normalizePlate(vehicle.plate) === normalizedPlate,
+    )
     if (plateExists) {
       setVehicleError('A vehicle with that plate already exists.')
       return
     }
 
-    setVehicles((currentVehicles) => [
-      ...currentVehicles,
-      {
-        id: nextId('VEH', currentVehicles),
-        ...sanitizedForm,
-        plate: normalizedPlate,
-        assignedDriver: 'Unassigned',
-        mileage: 0,
-      },
-    ])
-    setVehicleForm({ unit: '', type: 'Tractor', plate: '', status: 'Available' })
+    const payload = { ...sanitizedForm, plate: normalizedPlate }
+    setIsVehicleSaving(true)
+
+    try {
+      if (editingVehicleId) {
+        const updatedVehicle = await vehicleDriverApi.updateVehicle(editingVehicleId, payload, getAuthToken)
+        setVehicles((currentVehicles) =>
+          currentVehicles.map((vehicle) => (getRecordId(vehicle) === editingVehicleId ? updatedVehicle : vehicle)),
+        )
+        setSaveMessage('Vehicle updated successfully.')
+      } else {
+        const createdVehicle = await vehicleDriverApi.createVehicle({ ...payload, assignedDriver: 'Unassigned', mileage: 0 }, getAuthToken)
+        setVehicles((currentVehicles) => [...currentVehicles, createdVehicle])
+        setSaveMessage('Vehicle created successfully.')
+      }
+      resetVehicleForm()
+    } catch (requestError) {
+      setVehicleError(requestError.message)
+    } finally {
+      setIsVehicleSaving(false)
+    }
   }
 
-  const addDriver = (event) => {
+  const submitDriver = async (event) => {
     event.preventDefault()
     setDriverError('')
+    setSaveMessage('')
 
     const sanitizedForm = trimFormValues(driverForm)
     const nameError = validatePersonName(sanitizedForm.name, 'Driver name')
@@ -115,44 +176,84 @@ export default function VehicleDriverManagement() {
       return
     }
 
-    const phoneExists = drivers.some((driver) => normalizePhone(driver.phone) === normalizePhone(sanitizedForm.phone))
+    const phoneExists = drivers.some(
+      (driver) => getRecordId(driver) !== editingDriverId && normalizePhone(driver.phone) === normalizePhone(sanitizedForm.phone),
+    )
     if (phoneExists) {
       setDriverError('A driver with that phone number already exists.')
       return
     }
 
-    setDrivers((currentDrivers) => [
-      ...currentDrivers,
-      {
-        id: nextId('DRV', currentDrivers),
-        ...sanitizedForm,
-        phone: formatPhone(sanitizedForm.phone),
-        assignedVehicle: 'Unassigned',
-      },
-    ])
-    setDriverForm({ name: '', licenseClass: 'Class A CDL', phone: '', status: 'Available' })
+    const payload = { ...sanitizedForm, phone: formatPhone(sanitizedForm.phone) }
+    setIsDriverSaving(true)
+
+    try {
+      if (editingDriverId) {
+        const updatedDriver = await vehicleDriverApi.updateDriver(editingDriverId, payload, getAuthToken)
+        setDrivers((currentDrivers) =>
+          currentDrivers.map((driver) => (getRecordId(driver) === editingDriverId ? updatedDriver : driver)),
+        )
+        setSaveMessage('Driver updated successfully.')
+      } else {
+        const createdDriver = await vehicleDriverApi.createDriver({ ...payload, assignedVehicle: 'Unassigned' }, getAuthToken)
+        setDrivers((currentDrivers) => [...currentDrivers, createdDriver])
+        setSaveMessage('Driver created successfully.')
+      }
+      resetDriverForm()
+    } catch (requestError) {
+      setDriverError(requestError.message)
+    } finally {
+      setIsDriverSaving(false)
+    }
+  }
+
+  const editVehicle = (vehicle) => {
+    setEditingVehicleId(getRecordId(vehicle))
+    setVehicleError('')
+    setSaveMessage('')
+    setVehicleForm({ unit: vehicle.unit, type: vehicle.type, plate: vehicle.plate, status: vehicle.status })
+  }
+
+  const editDriver = (driver) => {
+    setEditingDriverId(getRecordId(driver))
+    setDriverError('')
+    setSaveMessage('')
+    setDriverForm({ name: driver.name, licenseClass: driver.licenseClass, phone: driver.phone, status: driver.status })
   }
 
   const requestDelete = (type, record) => {
     setDeleteTarget({
       type,
-      id: record.id,
+      id: getRecordId(record),
       label: type === 'vehicle' ? record.unit : record.name,
     })
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return
 
-    if (deleteTarget.type === 'vehicle') {
-      setVehicles((currentVehicles) => currentVehicles.filter((vehicle) => vehicle.id !== deleteTarget.id))
-    }
+    setLoadError('')
+    setSaveMessage('')
 
-    if (deleteTarget.type === 'driver') {
-      setDrivers((currentDrivers) => currentDrivers.filter((driver) => driver.id !== deleteTarget.id))
-    }
+    try {
+      if (deleteTarget.type === 'vehicle') {
+        await vehicleDriverApi.deleteVehicle(deleteTarget.id, getAuthToken)
+        setVehicles((currentVehicles) => currentVehicles.filter((vehicle) => getRecordId(vehicle) !== deleteTarget.id))
+        if (editingVehicleId === deleteTarget.id) resetVehicleForm()
+        setSaveMessage('Vehicle deleted successfully.')
+      }
 
-    setDeleteTarget(null)
+      if (deleteTarget.type === 'driver') {
+        await vehicleDriverApi.deleteDriver(deleteTarget.id, getAuthToken)
+        setDrivers((currentDrivers) => currentDrivers.filter((driver) => getRecordId(driver) !== deleteTarget.id))
+        if (editingDriverId === deleteTarget.id) resetDriverForm()
+        setSaveMessage('Driver deleted successfully.')
+      }
+
+      setDeleteTarget(null)
+    } catch (requestError) {
+      setLoadError(requestError.message)
+    }
   }
 
   const vehicleColumns = [
@@ -174,9 +275,15 @@ export default function VehicleDriverManagement() {
       label: 'Actions',
       className: 'cell-actions',
       render: (vehicle) => (
-        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('vehicle', vehicle)}>
-          Remove
-        </button>
+        <div className="inline-group">
+          <button className="button button-secondary button-small" type="button" onClick={() => editVehicle(vehicle)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
+          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('vehicle', vehicle)}>
+            Remove
+          </button>
+        </div>
       ),
     },
   ]
@@ -200,9 +307,15 @@ export default function VehicleDriverManagement() {
       label: 'Actions',
       className: 'cell-actions',
       render: (driver) => (
-        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('driver', driver)}>
-          Remove
-        </button>
+        <div className="inline-group">
+          <button className="button button-secondary button-small" type="button" onClick={() => editDriver(driver)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
+          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('driver', driver)}>
+            Remove
+          </button>
+        </div>
       ),
     },
   ]
@@ -218,6 +331,10 @@ export default function VehicleDriverManagement() {
         title="Vehicles & Drivers"
         description="Manage fleet availability, driver readiness, and asset assignments."
       />
+
+      {loadError ? <p className="auth-error">{loadError}</p> : null}
+      {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
+      {isLoading ? <Card title="Loading fleet records"><p>Fetching vehicles and drivers from the backend API.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Vehicle and driver summary">
         <StatCard label="Vehicles" value={vehicles.length} helper="Fleet records" tone="info" />
@@ -246,11 +363,11 @@ export default function VehicleDriverManagement() {
               </select>
             </Field>
           </Toolbar>
-          <DataTable columns={vehicleColumns} rows={filteredVehicles} getRowKey={(vehicle) => vehicle.id} />
+          <DataTable columns={vehicleColumns} rows={filteredVehicles} getRowKey={getRecordId} />
         </Card>
 
-        <Card eyebrow="Add vehicle" title="New vehicle record">
-          <form className="form-grid form-grid-single" onSubmit={addVehicle} noValidate>
+        <Card eyebrow={editingVehicleId ? 'Edit vehicle' : 'Add vehicle'} title={editingVehicleId ? 'Update vehicle record' : 'New vehicle record'}>
+          <form className="form-grid form-grid-single" onSubmit={submitVehicle} noValidate>
             <Field label="Unit name">
               <input
                 className="form-control"
@@ -296,9 +413,12 @@ export default function VehicleDriverManagement() {
               </select>
             </Field>
             {vehicleError ? <p className="auth-error">{vehicleError}</p> : null}
-            <button className="button button-primary" type="submit">
-              Add vehicle
-            </button>
+            <div className="inline-group">
+              <button className="button button-primary" type="submit" disabled={isVehicleSaving}>
+                {isVehicleSaving ? 'Saving...' : editingVehicleId ? 'Update vehicle' : 'Add vehicle'}
+              </button>
+              {editingVehicleId ? <button className="button button-secondary" type="button" onClick={resetVehicleForm} disabled={isVehicleSaving}>Cancel edit</button> : null}
+            </div>
           </form>
         </Card>
       </section>
@@ -323,11 +443,11 @@ export default function VehicleDriverManagement() {
               </select>
             </Field>
           </Toolbar>
-          <DataTable columns={driverColumns} rows={filteredDrivers} getRowKey={(driver) => driver.id} />
+          <DataTable columns={driverColumns} rows={filteredDrivers} getRowKey={getRecordId} />
         </Card>
 
-        <Card eyebrow="Add driver" title="New driver record">
-          <form className="form-grid form-grid-single" onSubmit={addDriver} noValidate>
+        <Card eyebrow={editingDriverId ? 'Edit driver' : 'Add driver'} title={editingDriverId ? 'Update driver record' : 'New driver record'}>
+          <form className="form-grid form-grid-single" onSubmit={submitDriver} noValidate>
             <Field label="Driver name">
               <input
                 className="form-control"
@@ -375,9 +495,12 @@ export default function VehicleDriverManagement() {
               </select>
             </Field>
             {driverError ? <p className="auth-error">{driverError}</p> : null}
-            <button className="button button-primary" type="submit">
-              Add driver
-            </button>
+            <div className="inline-group">
+              <button className="button button-primary" type="submit" disabled={isDriverSaving}>
+                {isDriverSaving ? 'Saving...' : editingDriverId ? 'Update driver' : 'Add driver'}
+              </button>
+              {editingDriverId ? <button className="button button-secondary" type="button" onClick={resetDriverForm} disabled={isDriverSaving}>Cancel edit</button> : null}
+            </div>
           </form>
         </Card>
       </section>

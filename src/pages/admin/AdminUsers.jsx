@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Badge from '../../components/ui/Badge.jsx'
 import Card from '../../components/ui/Card.jsx'
 import ConfirmModal from '../../components/ui/ConfirmModal.jsx'
@@ -29,6 +30,8 @@ export default function AdminUsers() {
   const [editForm, setEditForm] = useState({ displayName: '', role: 'user', status: 'active' })
   const [confirmAction, setConfirmAction] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSavingUser, setIsSavingUser] = useState(false)
+  const [savingUserId, setSavingUserId] = useState(null)
   const [error, setError] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -81,6 +84,8 @@ export default function AdminUsers() {
     setError('')
     setSaveMessage('')
 
+    setIsSavingUser(true)
+
     try {
       const updatedUser = await adminApi.updateUser(getUserId(selectedUser), editForm, getAuthToken)
       setSelectedUser(updatedUser)
@@ -89,12 +94,16 @@ export default function AdminUsers() {
       await reloadUsers()
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setIsSavingUser(false)
     }
   }
 
   const updateUser = async (user, payload) => {
     setError('')
     setSaveMessage('')
+
+    setSavingUserId(getUserId(user))
 
     try {
       const updatedUser = await adminApi.updateUser(getUserId(user), payload, getAuthToken)
@@ -104,6 +113,8 @@ export default function AdminUsers() {
       await reloadUsers()
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setSavingUserId(null)
     }
   }
 
@@ -132,14 +143,21 @@ export default function AdminUsers() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (user) => (
-        <div className="inline-group">
-          <button className="button button-secondary button-small" type="button" onClick={() => selectUser(user)}>View</button>
-          <button className="button button-secondary button-small" type="button" onClick={() => updateUser(user, { role: user.role === 'admin' ? 'user' : 'admin' })}>{user.role === 'admin' ? 'Make user' : 'Make admin'}</button>
-          <button className="button button-secondary button-small" type="button" onClick={() => updateUser(user, { status: user.status === 'active' ? 'disabled' : 'active' })}>{user.status === 'active' ? 'Disable' : 'Enable'}</button>
-          <button className="button button-secondary button-small" type="button" onClick={() => setConfirmAction({ user })}>Delete</button>
-        </div>
-      ),
+      render: (user) => {
+        const isRowSaving = savingUserId === getUserId(user)
+
+        return (
+          <div className="inline-group">
+            <button className="button button-secondary button-small" type="button" onClick={() => selectUser(user)}>
+              <Pencil className="lucide-icon" aria-hidden="true" />
+              Edit
+            </button>
+            <button className="button button-secondary button-small" type="button" disabled={isRowSaving} onClick={() => updateUser(user, { role: user.role === 'admin' ? 'user' : 'admin' })}>{user.role === 'admin' ? 'Make user' : 'Make admin'}</button>
+            <button className="button button-secondary button-small" type="button" disabled={isRowSaving} onClick={() => updateUser(user, { status: user.status === 'active' ? 'disabled' : 'active' })}>{user.status === 'active' ? 'Disable' : 'Enable'}</button>
+            <button className="button button-secondary button-small" type="button" disabled={isRowSaving} onClick={() => setConfirmAction({ user })}>Delete</button>
+          </div>
+        )
+      },
     },
   ]
 
@@ -220,7 +238,7 @@ export default function AdminUsers() {
                   <option value="disabled">disabled</option>
                 </select>
               </Field>
-              <button className="button button-primary" type="submit">Save user</button>
+              <button className="button button-primary" type="submit" disabled={isSavingUser}>{isSavingUser ? 'Saving...' : 'Save user'}</button>
             </form>
           ) : <p>Select a user to view profile details and make permitted edits.</p>}
         </Card>

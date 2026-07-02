@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Card from '../../components/ui/Card.jsx'
 import ConfirmModal from '../../components/ui/ConfirmModal.jsx'
 import DataTable from '../../components/ui/DataTable.jsx'
@@ -33,6 +34,7 @@ export default function AdminShipments() {
   const [editForm, setEditForm] = useState({ status: 'Pending', driverName: '', vehicleName: '', notes: '' })
   const [confirmAction, setConfirmAction] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [savingShipmentId, setSavingShipmentId] = useState(null)
   const [error, setError] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
 
@@ -87,6 +89,8 @@ export default function AdminShipments() {
     setError('')
     setSaveMessage('')
 
+    setSavingShipmentId(getShipmentId(shipment))
+
     try {
       const updatedShipment = await adminApi.updateShipment(getShipmentId(shipment), payload, getAuthToken)
       if (selectedShipment && getShipmentId(selectedShipment) === getShipmentId(shipment)) setSelectedShipment(updatedShipment)
@@ -94,6 +98,8 @@ export default function AdminShipments() {
       await reloadShipments()
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setSavingShipmentId(null)
     }
   }
 
@@ -129,18 +135,25 @@ export default function AdminShipments() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (shipment) => (
-        <div className="inline-group">
-          <button className="button button-secondary button-small" type="button" onClick={() => selectShipment(shipment)}>View</button>
-          <select className="form-control" value={shipment.status} onChange={(event) => updateShipment(shipment, { status: event.target.value })} aria-label={`Update ${shipment.shipmentNumber} status`}>
-            <option>Pending</option>
-            <option>In Transit</option>
-            <option>Delivered</option>
-            <option>Cancelled</option>
-          </select>
-          <button className="button button-secondary button-small" type="button" onClick={() => setConfirmAction({ shipment })}>Delete</button>
-        </div>
-      ),
+      render: (shipment) => {
+        const isRowSaving = savingShipmentId === getShipmentId(shipment)
+
+        return (
+          <div className="inline-group">
+            <button className="button button-secondary button-small" type="button" onClick={() => selectShipment(shipment)}>
+              <Pencil className="lucide-icon" aria-hidden="true" />
+              Edit
+            </button>
+            <select className="form-control" value={shipment.status} disabled={isRowSaving} onChange={(event) => updateShipment(shipment, { status: event.target.value })} aria-label={`Update ${shipment.shipmentNumber} status`}>
+              <option>Pending</option>
+              <option>In Transit</option>
+              <option>Delivered</option>
+              <option>Cancelled</option>
+            </select>
+            <button className="button button-secondary button-small" type="button" disabled={isRowSaving} onClick={() => setConfirmAction({ shipment })}>Delete</button>
+          </div>
+        )
+      },
     },
   ]
 
@@ -221,7 +234,7 @@ export default function AdminShipments() {
               <Field label="Notes">
                 <textarea className="form-control textarea-control" rows="4" value={editForm.notes} onChange={(event) => setEditForm({ ...editForm, notes: event.target.value })} />
               </Field>
-              <button className="button button-primary" type="submit">Save shipment</button>
+              <button className="button button-primary" type="submit" disabled={savingShipmentId === getShipmentId(selectedShipment)}>{savingShipmentId === getShipmentId(selectedShipment) ? 'Saving...' : 'Save shipment'}</button>
             </form>
           ) : <p>Select a shipment to view details and update status, driver, vehicle, or notes.</p>}
         </Card>

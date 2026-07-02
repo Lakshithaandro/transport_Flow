@@ -10,10 +10,15 @@ import adminRouter from './routes/admin/index.js'
 import aiRouter from './routes/ai.routes.js'
 import analyticsRouter from './routes/analytics.routes.js'
 import authRouter from './routes/auth.routes.js'
+import customersRouter from './routes/customers.routes.js'
+import driversRouter from './routes/drivers.routes.js'
 import fuelLogsRouter from './routes/fuelLogs.routes.js'
 import invoicesRouter from './routes/invoices.routes.js'
 import maintenanceRouter from './routes/maintenance.routes.js'
+import routesRouter from './routes/routes.routes.js'
 import summaryRouter from './routes/summary.routes.js'
+import tripsRouter from './routes/trips.routes.js'
+import vehiclesRouter from './routes/vehicles.routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -37,6 +42,11 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRateLimiter, authenticateUser, authorizeAdmin, adminRouter)
+app.use('/api/vehicles', requireAuth, vehiclesRouter)
+app.use('/api/drivers', requireAuth, driversRouter)
+app.use('/api/customers', requireAuth, customersRouter)
+app.use('/api/routes', requireAuth, routesRouter)
+app.use('/api/trips', requireAuth, tripsRouter)
 app.use('/api/fuel-logs', requireAuth, fuelLogsRouter)
 app.use('/api/maintenance', requireAuth, maintenanceRouter)
 app.use('/api/fuel-maintenance', requireAuth, summaryRouter)
