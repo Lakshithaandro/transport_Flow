@@ -5,6 +5,7 @@ import ProtectedRoute from './components/routing/ProtectedRoute.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import CustomerRouteTripManagement from './pages/CustomerRouteTripManagement.jsx'
+import Dashboard from './pages/Dashboard.jsx'
 import FuelMaintenanceManagement from './pages/FuelMaintenanceManagement.jsx'
 import InvoicePaymentManagement from './pages/InvoicePaymentManagement.jsx'
 import LogisticsAssistant from './pages/LogisticsAssistant'
@@ -40,7 +41,8 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Navigate to="/vehicles-drivers" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
             <Route path="/vehicles-drivers" element={<ProtectedPage><VehicleDriverManagement /></ProtectedPage>} />
             <Route path="/customers-routes-trips" element={<ProtectedPage><CustomerRouteTripManagement /></ProtectedPage>} />
             <Route path="/fuel-maintenance" element={<ProtectedPage><FuelMaintenanceManagement /></ProtectedPage>} />
