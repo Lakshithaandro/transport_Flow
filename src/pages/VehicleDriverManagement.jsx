@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { AlertTriangle, FileText, Pencil } from 'lucide-react'
+import Badge from '../components/ui/Badge.jsx'
 import Card from '../components/ui/Card.jsx'
 import ConfirmModal from '../components/ui/ConfirmModal.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
@@ -26,11 +27,258 @@ const vehicleTypeOptions = ['Tractor', 'Dry Van Trailer', 'Reefer Trailer', 'Fla
 const vehicleStatusOptions = ['Available', 'Assigned', 'Maintenance']
 const driverLicenseOptions = ['Class A CDL', 'Class B CDL']
 const driverStatusOptions = ['Available', 'Assigned', 'Needs Review']
-const emptyVehicleForm = { unit: '', type: 'Tractor', plate: '', status: 'Available' }
-const emptyDriverForm = { name: '', licenseClass: 'Class A CDL', phone: '', status: 'Available' }
+const emptyVehicleForm = {
+  unit: '',
+  type: 'Tractor',
+  plate: '',
+  status: 'Available',
+  insuranceExpiry: '',
+  pucExpiry: '',
+  permitExpiry: '',
+  fitnessCertificateExpiry: '',
+  serviceDueDate: '',
+}
+const emptyDriverForm = {
+  name: '',
+  licenseClass: 'Class A CDL',
+  phone: '',
+  status: 'Available',
+  licenseExpiry: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+  documents: [],
+}
+const millisecondsInDay = 1000 * 60 * 60 * 24
 
 function getRecordId(record) {
   return record._id || record.id
+}
+
+function parseDateOnly(value) {
+  if (!value) return null
+
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+
+  const parsedDate = new Date(year, month - 1, day)
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate
+}
+
+function getTodayDateOnly() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
+}
+
+function formatDateInputValue(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getTodayDateInputValue() {
+  return formatDateInputValue(getTodayDateOnly())
+}
+
+function getTomorrowDateInputValue() {
+  const tomorrow = getTodayDateOnly()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return formatDateInputValue(tomorrow)
+}
+
+function getVehicleDateErrors(formValues) {
+  const today = getTodayDateInputValue()
+  const errors = {}
+
+  if (formValues.insuranceExpiry && formValues.insuranceExpiry < today) {
+    errors.insuranceExpiry = 'Insurance expiry date cannot be in the past.'
+  } else if (formValues.insuranceExpiry && formValues.insuranceExpiry === today) {
+    errors.insuranceExpiry = 'Insurance expiry date must be after today.'
+  }
+
+  if (formValues.pucExpiry && formValues.pucExpiry < today) {
+    errors.pucExpiry = 'PUC expiry date cannot be in the past.'
+  }
+
+  if (formValues.permitExpiry && formValues.permitExpiry < today) {
+    errors.permitExpiry = 'Permit expiry date cannot be in the past.'
+  }
+
+  if (formValues.fitnessCertificateExpiry && formValues.fitnessCertificateExpiry < today) {
+    errors.fitnessCertificateExpiry = 'Fitness certificate expiry date cannot be in the past.'
+  }
+
+  if (formValues.serviceDueDate && formValues.serviceDueDate < today) {
+    errors.serviceDueDate = 'Service due date cannot be earlier than today.'
+  }
+
+  return errors
+}
+
+function getDriverDateErrors(formValues) {
+  const today = getTodayDateInputValue()
+  const errors = {}
+
+  if (formValues.licenseExpiry && formValues.licenseExpiry < today) {
+    errors.licenseExpiry = 'Driving license expiry date cannot be in the past.'
+  }
+
+  return errors
+}
+
+function getDaysUntil(value) {
+  const date = parseDateOnly(value)
+  if (!date) return null
+
+  return Math.ceil((date.getTime() - getTodayDateOnly().getTime()) / millisecondsInDay)
+}
+
+function isExpired(value) {
+  const daysUntil = getDaysUntil(value)
+  return daysUntil !== null && daysUntil < 0
+}
+
+function isDueTodayOrOverdue(value) {
+  const daysUntil = getDaysUntil(value)
+  return daysUntil !== null && daysUntil <= 0
+}
+
+function isExpiringWithin(value, days) {
+  const daysUntil = getDaysUntil(value)
+  return daysUntil !== null && daysUntil >= 0 && daysUntil <= days
+}
+
+function formatDate(value) {
+  const date = parseDateOnly(value)
+  if (!date) return 'Not set'
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatDaysUntil(value) {
+  const daysUntil = getDaysUntil(value)
+  if (daysUntil === null) return ''
+  if (daysUntil === 0) return 'today'
+  if (daysUntil === 1) return 'in 1 day'
+  if (daysUntil > 1) return `in ${daysUntil} days`
+
+  const daysExpired = Math.abs(daysUntil)
+  return daysExpired === 1 ? '1 day ago' : `${daysExpired} days ago`
+}
+
+function getExpiryTone(value) {
+  if (!value) return 'neutral'
+  if (isExpired(value)) return 'danger'
+  if (isExpiringWithin(value, 15)) return 'warning'
+  return 'success'
+}
+
+function createVehicleAlerts(vehicle) {
+  const alerts = []
+
+  if (isExpiringWithin(vehicle.insuranceExpiry, 15)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-insurance`,
+      tone: 'warning',
+      title: 'Insurance expiring in 15 days',
+      detail: `${vehicle.unit} insurance expires ${formatDaysUntil(vehicle.insuranceExpiry)} (${formatDate(vehicle.insuranceExpiry)}).`,
+    })
+  }
+
+  if (isExpired(vehicle.permitExpiry)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-permit-expired`,
+      tone: 'danger',
+      title: 'Permit expired',
+      detail: `${vehicle.unit} permit expired ${formatDaysUntil(vehicle.permitExpiry)} (${formatDate(vehicle.permitExpiry)}).`,
+    })
+  } else if (isExpiringWithin(vehicle.permitExpiry, 15)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-permit-expiring`,
+      tone: 'warning',
+      title: 'Permit expiring in 15 days',
+      detail: `${vehicle.unit} permit expires ${formatDaysUntil(vehicle.permitExpiry)} (${formatDate(vehicle.permitExpiry)}).`,
+    })
+  }
+
+  if (isExpired(vehicle.fitnessCertificateExpiry)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-fitness-expired`,
+      tone: 'danger',
+      title: 'Fitness certificate expired',
+      detail: `${vehicle.unit} fitness certificate expired ${formatDaysUntil(vehicle.fitnessCertificateExpiry)} (${formatDate(vehicle.fitnessCertificateExpiry)}).`,
+    })
+  } else if (isExpiringWithin(vehicle.fitnessCertificateExpiry, 15)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-fitness-expiring`,
+      tone: 'warning',
+      title: 'Fitness certificate expiring in 15 days',
+      detail: `${vehicle.unit} fitness certificate expires ${formatDaysUntil(vehicle.fitnessCertificateExpiry)} (${formatDate(vehicle.fitnessCertificateExpiry)}).`,
+    })
+  }
+
+  if (isDueTodayOrOverdue(vehicle.serviceDueDate)) {
+    alerts.push({
+      id: `${getRecordId(vehicle)}-service`,
+      tone: 'warning',
+      title: 'Vehicle due for servicing',
+      detail: `${vehicle.unit} service due date is ${formatDate(vehicle.serviceDueDate)}.`,
+    })
+  }
+
+  return alerts
+}
+
+function createDriverAlerts(driver) {
+  const alerts = []
+
+  if (isExpired(driver.licenseExpiry)) {
+    alerts.push({
+      id: `${getRecordId(driver)}-license-expired`,
+      tone: 'danger',
+      title: 'License expired',
+      detail: `${driver.name} license expired ${formatDaysUntil(driver.licenseExpiry)} (${formatDate(driver.licenseExpiry)}).`,
+    })
+  } else if (isExpiringWithin(driver.licenseExpiry, 30)) {
+    alerts.push({
+      id: `${getRecordId(driver)}-license-expiring`,
+      tone: 'warning',
+      title: 'Driving license expiring in 30 days',
+      detail: `${driver.name} license expires ${formatDaysUntil(driver.licenseExpiry)} (${formatDate(driver.licenseExpiry)}).`,
+    })
+  }
+
+  return alerts
+}
+
+function ExpiryBadge({ label, value }) {
+  return (
+    <span className="expiry-badge-row">
+      <span>{label}</span>
+      <Badge tone={getExpiryTone(value)}>{formatDate(value)}</Badge>
+    </span>
+  )
+}
+
+function renderDocuments(documents = []) {
+  if (!documents.length) return <span className="cell-muted">No PDFs</span>
+
+  return (
+    <div className="document-chip-list">
+      {documents.map((document) => (
+        <span className="document-chip" key={`${document.name}-${document.uploadedAt || ''}`}>
+          <FileText className="lucide-icon" aria-hidden="true" />
+          {document.name}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export default function VehicleDriverManagement() {
@@ -79,7 +327,19 @@ export default function VehicleDriverManagement() {
   }, [])
 
   const filteredVehicles = vehicles.filter((vehicle) => {
-    const searchableText = [vehicle.unit, vehicle.type, vehicle.plate, vehicle.assignedDriver].join(' ').toLowerCase()
+    const searchableText = [
+      vehicle.unit,
+      vehicle.type,
+      vehicle.plate,
+      vehicle.assignedDriver,
+      vehicle.insuranceExpiry,
+      vehicle.pucExpiry,
+      vehicle.permitExpiry,
+      vehicle.fitnessCertificateExpiry,
+      vehicle.serviceDueDate,
+    ]
+      .join(' ')
+      .toLowerCase()
     const matchesQuery = searchableText.includes(vehicleQuery.toLowerCase())
     const matchesStatus = vehicleStatus === 'All' || vehicle.status === vehicleStatus
 
@@ -87,7 +347,18 @@ export default function VehicleDriverManagement() {
   })
 
   const filteredDrivers = drivers.filter((driver) => {
-    const searchableText = [driver.name, driver.licenseClass, driver.phone, driver.assignedVehicle].join(' ').toLowerCase()
+    const searchableText = [
+      driver.name,
+      driver.licenseClass,
+      driver.phone,
+      driver.assignedVehicle,
+      driver.licenseExpiry,
+      driver.emergencyContactName,
+      driver.emergencyContactPhone,
+      ...(driver.documents || []).map((document) => document.name),
+    ]
+      .join(' ')
+      .toLowerCase()
     const matchesQuery = searchableText.includes(driverQuery.toLowerCase())
     const matchesStatus = driverStatus === 'All' || driver.status === driverStatus
 
@@ -115,9 +386,19 @@ export default function VehicleDriverManagement() {
     const normalizedPlate = normalizePlate(sanitizedForm.plate)
     const unitError = validateBusinessText(sanitizedForm.unit, 'Unit name', { min: 2, max: 40 })
     const plateError = validatePlate(sanitizedForm.plate)
+    const vehicleDateFields = [
+      ['insuranceExpiry', 'Insurance expiry'],
+      ['pucExpiry', 'PUC expiry'],
+      ['permitExpiry', 'Permit expiry'],
+      ['fitnessCertificateExpiry', 'Fitness certificate expiry'],
+      ['serviceDueDate', 'Service due date'],
+    ]
+    const missingDateField = vehicleDateFields.find(([key]) => !sanitizedForm[key])
+    const vehicleDateErrors = getVehicleDateErrors(sanitizedForm)
+    const vehicleDateError = Object.values(vehicleDateErrors)[0]
 
-    if (unitError || plateError) {
-      setVehicleError(unitError || plateError)
+    if (unitError || plateError || missingDateField || vehicleDateError) {
+      setVehicleError(unitError || plateError || (missingDateField ? `${missingDateField[1]} is required.` : vehicleDateError))
       return
     }
 
@@ -165,9 +446,22 @@ export default function VehicleDriverManagement() {
     const sanitizedForm = trimFormValues(driverForm)
     const nameError = validatePersonName(sanitizedForm.name, 'Driver name')
     const phoneError = validatePhone(sanitizedForm.phone)
+    const emergencyNameError = validatePersonName(sanitizedForm.emergencyContactName, 'Emergency contact name')
+    const emergencyPhoneError = validatePhone(sanitizedForm.emergencyContactPhone, 'Emergency contact phone')
 
-    if (nameError || phoneError) {
-      setDriverError(nameError || phoneError)
+    if (nameError || phoneError || emergencyNameError || emergencyPhoneError) {
+      setDriverError(nameError || phoneError || emergencyNameError || emergencyPhoneError)
+      return
+    }
+
+    if (!sanitizedForm.licenseExpiry) {
+      setDriverError('License expiry is required.')
+      return
+    }
+
+    const driverDateErrors = getDriverDateErrors(sanitizedForm)
+    if (driverDateErrors.licenseExpiry) {
+      setDriverError(driverDateErrors.licenseExpiry)
       return
     }
 
@@ -184,7 +478,12 @@ export default function VehicleDriverManagement() {
       return
     }
 
-    const payload = { ...sanitizedForm, phone: formatPhone(sanitizedForm.phone) }
+    const payload = {
+      ...sanitizedForm,
+      phone: formatPhone(sanitizedForm.phone),
+      emergencyContactPhone: formatPhone(sanitizedForm.emergencyContactPhone),
+      documents: driverForm.documents || [],
+    }
     setIsDriverSaving(true)
 
     try {
@@ -211,14 +510,68 @@ export default function VehicleDriverManagement() {
     setEditingVehicleId(getRecordId(vehicle))
     setVehicleError('')
     setSaveMessage('')
-    setVehicleForm({ unit: vehicle.unit, type: vehicle.type, plate: vehicle.plate, status: vehicle.status })
+    setVehicleForm({
+      unit: vehicle.unit || '',
+      type: vehicle.type || 'Tractor',
+      plate: vehicle.plate || '',
+      status: vehicle.status || 'Available',
+      insuranceExpiry: vehicle.insuranceExpiry || '',
+      pucExpiry: vehicle.pucExpiry || '',
+      permitExpiry: vehicle.permitExpiry || '',
+      fitnessCertificateExpiry: vehicle.fitnessCertificateExpiry || '',
+      serviceDueDate: vehicle.serviceDueDate || '',
+    })
   }
 
   const editDriver = (driver) => {
     setEditingDriverId(getRecordId(driver))
     setDriverError('')
     setSaveMessage('')
-    setDriverForm({ name: driver.name, licenseClass: driver.licenseClass, phone: driver.phone, status: driver.status })
+    setDriverForm({
+      name: driver.name || '',
+      licenseClass: driver.licenseClass || 'Class A CDL',
+      phone: driver.phone || '',
+      status: driver.status || 'Available',
+      licenseExpiry: driver.licenseExpiry || '',
+      emergencyContactName: driver.emergencyContactName || '',
+      emergencyContactPhone: driver.emergencyContactPhone || '',
+      documents: driver.documents || [],
+    })
+  }
+
+  const handleDriverDocuments = (event) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+
+    const invalidFile = files.find((file) => file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf'))
+    if (invalidFile) {
+      setDriverError('Driver documents must be PDF files only.')
+      event.target.value = ''
+      return
+    }
+
+    const nextDocuments = files.map((file) => ({
+      name: file.name,
+      type: 'application/pdf',
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+    }))
+
+    setDriverForm((currentForm) => ({
+      ...currentForm,
+      documents: [...(currentForm.documents || []), ...nextDocuments].filter(
+        (document, index, documents) => documents.findIndex((item) => item.name === document.name) === index,
+      ),
+    }))
+    setDriverError('')
+    event.target.value = ''
+  }
+
+  const removeDriverDocument = (documentName) => {
+    setDriverForm((currentForm) => ({
+      ...currentForm,
+      documents: (currentForm.documents || []).filter((document) => document.name !== documentName),
+    }))
   }
 
   const requestDelete = (type, record) => {
@@ -271,6 +624,19 @@ export default function VehicleDriverManagement() {
     },
     { key: 'assignedDriver', label: 'Assigned driver' },
     {
+      key: 'compliance',
+      label: 'Compliance expiry',
+      render: (vehicle) => (
+        <div className="expiry-stack">
+          <ExpiryBadge label="Insurance" value={vehicle.insuranceExpiry} />
+          <ExpiryBadge label="PUC" value={vehicle.pucExpiry} />
+          <ExpiryBadge label="Permit" value={vehicle.permitExpiry} />
+          <ExpiryBadge label="Fitness" value={vehicle.fitnessCertificateExpiry} />
+          <ExpiryBadge label="Service" value={vehicle.serviceDueDate} />
+        </div>
+      ),
+    },
+    {
       key: 'actions',
       label: 'Actions',
       className: 'cell-actions',
@@ -295,13 +661,33 @@ export default function VehicleDriverManagement() {
       render: (driver) => <strong className="cell-primary">{driver.name}</strong>,
     },
     { key: 'licenseClass', label: 'License' },
+    {
+      key: 'licenseExpiry',
+      label: 'License expiry',
+      render: (driver) => <ExpiryBadge label="Expires" value={driver.licenseExpiry} />,
+    },
     { key: 'phone', label: 'Phone' },
+    {
+      key: 'emergencyContact',
+      label: 'Emergency contact',
+      render: (driver) => (
+        <span className="stacked-cell">
+          <strong>{driver.emergencyContactName || 'Not set'}</strong>
+          <span>{driver.emergencyContactPhone || 'Not set'}</span>
+        </span>
+      ),
+    },
     {
       key: 'status',
       label: 'Status',
       render: (driver) => <StatusBadge status={driver.status} />,
     },
     { key: 'assignedVehicle', label: 'Assigned vehicle' },
+    {
+      key: 'documents',
+      label: 'Documents',
+      render: (driver) => renderDocuments(driver.documents),
+    },
     {
       key: 'actions',
       label: 'Actions',
@@ -320,16 +706,23 @@ export default function VehicleDriverManagement() {
     },
   ]
 
+  const vehicleAlerts = vehicles.flatMap(createVehicleAlerts)
+  const driverAlerts = drivers.flatMap(createDriverAlerts)
+  const complianceAlerts = [...vehicleAlerts, ...driverAlerts]
   const availableVehicles = vehicles.filter((vehicle) => vehicle.status === 'Available').length
   const availableDrivers = drivers.filter((driver) => driver.status === 'Available').length
   const reviewDrivers = drivers.filter((driver) => driver.status === 'Needs Review').length
+  const todayDateInputValue = getTodayDateInputValue()
+  const tomorrowDateInputValue = getTomorrowDateInputValue()
+  const vehicleDateErrors = getVehicleDateErrors(vehicleForm)
+  const driverDateErrors = getDriverDateErrors(driverForm)
 
   return (
     <div className="page-stack">
       <PageHeader
         eyebrow="Fleet Operations"
         title="Vehicles & Drivers"
-        description="Manage fleet availability, driver readiness, and asset assignments."
+        description="Manage fleet availability, driver readiness, compliance expiries, documents, and asset assignments."
       />
 
       {loadError ? <p className="auth-error">{loadError}</p> : null}
@@ -339,9 +732,27 @@ export default function VehicleDriverManagement() {
       <section className="stat-grid" aria-label="Vehicle and driver summary">
         <StatCard label="Vehicles" value={vehicles.length} helper="Fleet records" tone="info" />
         <StatCard label="Available vehicles" value={availableVehicles} helper="Ready for dispatch" tone="success" />
-        <StatCard label="Drivers" value={drivers.length} helper="Driver records" tone="info" />
-        <StatCard label="Drivers ready" value={availableDrivers} helper={`${reviewDrivers} need review`} tone="success" />
+        <StatCard label="Drivers" value={drivers.length} helper={`${availableDrivers} ready`} tone="info" />
+        <StatCard label="Compliance alerts" value={complianceAlerts.length} helper={`${reviewDrivers} drivers need review`} tone="warning" />
       </section>
+
+      <Card eyebrow="Alerts" title="Fleet and driver compliance alerts">
+        {complianceAlerts.length ? (
+          <div className="alert-grid">
+            {complianceAlerts.map((alert) => (
+              <article className={`alert-card alert-card-${alert.tone}`} key={alert.id}>
+                <AlertTriangle className="lucide-icon" aria-hidden="true" />
+                <div>
+                  <strong>{alert.title}</strong>
+                  <p>{alert.detail}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p>No active insurance, permit, servicing, or license expiry alerts.</p>
+        )}
+      </Card>
 
       <section className="split-layout split-layout-wide">
         <Card className="table-shell" eyebrow="Vehicles" title="Vehicle records">
@@ -352,7 +763,7 @@ export default function VehicleDriverManagement() {
                 type="search"
                 value={vehicleQuery}
                 onChange={(event) => setVehicleQuery(event.target.value)}
-                placeholder="Search unit, type, plate..."
+                placeholder="Search unit, type, plate, expiry..."
               />
             </Field>
             <Field label="Status">
@@ -412,6 +823,56 @@ export default function VehicleDriverManagement() {
                 ))}
               </select>
             </Field>
+            <Field label="Insurance expiry" helper={vehicleDateErrors.insuranceExpiry}>
+              <input
+                className="form-control"
+                type="date"
+                min={tomorrowDateInputValue}
+                value={vehicleForm.insuranceExpiry}
+                onChange={(event) => setVehicleForm({ ...vehicleForm, insuranceExpiry: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="PUC expiry" helper={vehicleDateErrors.pucExpiry}>
+              <input
+                className="form-control"
+                type="date"
+                min={todayDateInputValue}
+                value={vehicleForm.pucExpiry}
+                onChange={(event) => setVehicleForm({ ...vehicleForm, pucExpiry: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Permit expiry" helper={vehicleDateErrors.permitExpiry}>
+              <input
+                className="form-control"
+                type="date"
+                min={todayDateInputValue}
+                value={vehicleForm.permitExpiry}
+                onChange={(event) => setVehicleForm({ ...vehicleForm, permitExpiry: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Fitness certificate expiry" helper={vehicleDateErrors.fitnessCertificateExpiry}>
+              <input
+                className="form-control"
+                type="date"
+                min={todayDateInputValue}
+                value={vehicleForm.fitnessCertificateExpiry}
+                onChange={(event) => setVehicleForm({ ...vehicleForm, fitnessCertificateExpiry: event.target.value })}
+                required
+              />
+            </Field>
+            <Field label="Service due date" helper={vehicleDateErrors.serviceDueDate}>
+              <input
+                className="form-control"
+                type="date"
+                min={todayDateInputValue}
+                value={vehicleForm.serviceDueDate}
+                onChange={(event) => setVehicleForm({ ...vehicleForm, serviceDueDate: event.target.value })}
+                required
+              />
+            </Field>
             {vehicleError ? <p className="auth-error">{vehicleError}</p> : null}
             <div className="inline-group">
               <button className="button button-primary" type="submit" disabled={isVehicleSaving}>
@@ -432,7 +893,7 @@ export default function VehicleDriverManagement() {
                 type="search"
                 value={driverQuery}
                 onChange={(event) => setDriverQuery(event.target.value)}
-                placeholder="Search name, license, phone..."
+                placeholder="Search name, license, phone, documents..."
               />
             </Field>
             <Field label="Status">
@@ -470,6 +931,16 @@ export default function VehicleDriverManagement() {
                 ))}
               </select>
             </Field>
+            <Field label="License expiry" helper={driverDateErrors.licenseExpiry}>
+              <input
+                className="form-control"
+                type="date"
+                min={todayDateInputValue}
+                value={driverForm.licenseExpiry}
+                onChange={(event) => setDriverForm({ ...driverForm, licenseExpiry: event.target.value })}
+                required
+              />
+            </Field>
             <Field label="Phone">
               <input
                 className="form-control"
@@ -482,6 +953,44 @@ export default function VehicleDriverManagement() {
                 required
               />
             </Field>
+            <Field label="Emergency contact name">
+              <input
+                className="form-control"
+                value={driverForm.emergencyContactName}
+                onChange={(event) => setDriverForm({ ...driverForm, emergencyContactName: event.target.value })}
+                placeholder="Emergency contact"
+                maxLength="80"
+                required
+              />
+            </Field>
+            <Field label="Emergency contact phone">
+              <input
+                className="form-control"
+                value={driverForm.emergencyContactPhone}
+                onChange={(event) => setDriverForm({ ...driverForm, emergencyContactPhone: event.target.value })}
+                placeholder="(555) 000-0000"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength="18"
+                required
+              />
+            </Field>
+            <Field label="Documents" helper="Only PDF files are accepted. File metadata is saved with the driver record.">
+              <input className="form-control" type="file" accept="application/pdf,.pdf" multiple onChange={handleDriverDocuments} />
+            </Field>
+            {driverForm.documents.length ? (
+              <div className="document-review-list" aria-label="Selected driver documents">
+                {driverForm.documents.map((document) => (
+                  <span className="document-chip" key={`${document.name}-${document.uploadedAt || ''}`}>
+                    <FileText className="lucide-icon" aria-hidden="true" />
+                    {document.name}
+                    <button className="document-remove" type="button" onClick={() => removeDriverDocument(document.name)} aria-label={`Remove ${document.name}`}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <Field label="Status">
               <select
                 className="form-control"

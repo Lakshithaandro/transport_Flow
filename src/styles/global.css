@@ -566,6 +566,118 @@ p {
   color: var(--color-muted);
 }
 
+.alert-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.alert-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+}
+
+.alert-card strong {
+  color: var(--color-text-strong);
+}
+
+.alert-card p {
+  margin: 0.18rem 0 0;
+  font-size: 0.86rem;
+}
+
+.alert-card-warning {
+  border-color: color-mix(in srgb, var(--color-warning) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning-soft) 68%, var(--color-surface));
+}
+
+.alert-card-warning .lucide-icon {
+  color: var(--color-warning);
+}
+
+.alert-card-danger {
+  border-color: color-mix(in srgb, var(--color-danger) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-soft) 68%, var(--color-surface));
+}
+
+.alert-card-danger .lucide-icon {
+  color: var(--color-danger);
+}
+
+.expiry-stack,
+.stacked-cell,
+.document-chip-list,
+.document-review-list {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.expiry-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-width: 210px;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.expiry-badge-row .badge {
+  flex: 0 0 auto;
+}
+
+.stacked-cell strong {
+  color: var(--color-text-strong);
+}
+
+.stacked-cell span {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.document-chip-list,
+.document-review-list {
+  align-items: start;
+}
+
+.document-chip {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.document-chip .lucide-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--color-primary);
+}
+
+.document-remove {
+  display: grid;
+  width: 1.2rem;
+  height: 1.2rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-weight: 900;
+  line-height: 1;
+}
+
 .empty-state {
   display: grid;
   justify-items: center;
@@ -660,7 +772,18 @@ p {
   }
 
   .swatch-grid,
+<<<<<<< Updated upstream
   .form-grid {
+=======
+  .form-grid,
+  .quick-prompt-grid,
+  .stat-grid,
+  .alert-grid,
+  .recommendation-grid,
+  .assistant-feature-grid,
+  .assistant-query-form,
+  .nav-stack {
+>>>>>>> Stashed changes
     grid-template-columns: 1fr;
   }
 
