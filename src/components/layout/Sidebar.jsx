@@ -1,35 +1,44 @@
 import { NavLink } from 'react-router-dom'
-import Badge from '../ui/Badge.jsx'
+import useAuth from '../../context/useAuth.js'
 
 const navigation = [
-  { label: 'Overview', to: '/', end: true },
-  { label: 'Vehicles & Drivers', to: '/vehicles-drivers' },
-  { label: 'Customers, Routes & Trips', to: '/customers-routes-trips' },
-  { label: 'Design System', to: '/design-system' },
+  { label: 'Fleet', to: '/vehicles-drivers' },
+  { label: 'Customers & Routes', to: '/customers-routes-trips' },
+  { label: 'Fuel & Maintenance', to: '/fuel-maintenance' },
+  { label: 'Invoices & Payments', to: '/invoices-payments' },
+  { label: 'Reports', to: '/reports-analytics' },
+  { label: 'Assistant', to: '/logistics-assistant' },
 ]
 
 export default function Sidebar() {
+  const { isAdmin } = useAuth()
+
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="brand-block">
         <div className="brand-mark">TF</div>
         <div>
           <p className="brand-name">TransportFlow AI</p>
-          <p className="brand-caption">Milestone 3 workspace</p>
+          <p className="brand-caption">Logistics ERP</p>
         </div>
       </div>
 
       <nav className="nav-stack">
         {navigation.map((item) => (
-          <NavLink className="nav-link" to={item.to} end={item.end} key={item.to}>
-            {item.label}
+          <NavLink className="nav-link" to={item.to} key={item.to}>
+            <span>{item.label}</span>
           </NavLink>
         ))}
+        {isAdmin ? (
+          <NavLink className="nav-link" to="/admin/dashboard">
+            <span>Admin</span>
+          </NavLink>
+        ) : null}
       </nav>
 
-      <div className="sidebar-note">
-        <Badge tone="info">Milestone 3</Badge>
-        <p>Authentication, vehicles, drivers, customers, routes, and trips.</p>
+      <div className="workspace-card">
+        <span className="workspace-label">Workspace</span>
+        <strong>Transport Operations</strong>
       </div>
     </aside>
   )

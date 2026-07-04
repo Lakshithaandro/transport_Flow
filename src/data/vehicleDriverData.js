@@ -1,14 +1,3 @@
-export const demoUser = {
-  name: 'Demo Dispatcher',
-  email: 'demo@transportflow.ai',
-  role: 'Operations Manager',
-}
-
-export const demoCredentials = {
-  email: 'demo@transportflow.ai',
-  password: 'password',
-}
-
 export const initialVehicles = [
   {
     id: 'VEH-101',

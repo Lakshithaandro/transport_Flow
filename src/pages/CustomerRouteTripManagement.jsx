@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Card from '../components/ui/Card.jsx'
+import ConfirmModal from '../components/ui/ConfirmModal.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
 import Field from '../components/ui/Field.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
@@ -7,13 +8,30 @@ import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
 import { initialCustomers, initialRoutes, initialTrips } from '../data/customerRouteTripData.js'
+import { isBeforeToday, todayDateInputValue } from '../utils/date.js'
+import {
+  formatPhone,
+  normalizePhone,
+  parseBoundedNumber,
+  trimFormValues,
+  validateBusinessText,
+  validateCompanyName,
+  validateLocation,
+  validateOptionalEmail,
+  validatePersonName,
+  validatePhone,
+} from '../utils/validation.js'
 
 const customerStatusOptions = ['All', 'Active', 'Inactive', 'Needs Review']
 const routeStatusOptions = ['All', 'Active', 'Draft', 'Needs Review']
 const tripStatusOptions = ['All', 'Scheduled', 'In Transit', 'Delayed', 'Completed']
+const customerFormStatusOptions = ['Active', 'Inactive', 'Needs Review']
+const routeFormStatusOptions = ['Active', 'Draft', 'Needs Review']
+const tripFormStatusOptions = ['Scheduled', 'In Transit', 'Delayed', 'Completed']
 
 function nextId(prefix, records) {
-  return `${prefix}-${String(records.length + 1).padStart(3, '0')}`
+  const nextNumber = Math.max(0, ...records.map((record) => Number(String(record.id).replace(`${prefix}-`, '')) || 0)) + 1
+  return `${prefix}-${String(nextNumber).padStart(3, '0')}`
 }
 
 export default function CustomerRouteTripManagement() {
@@ -26,6 +44,11 @@ export default function CustomerRouteTripManagement() {
   const [customerStatus, setCustomerStatus] = useState('All')
   const [routeStatus, setRouteStatus] = useState('All')
   const [tripStatus, setTripStatus] = useState('All')
+  const [customerError, setCustomerError] = useState('')
+  const [routeError, setRouteError] = useState('')
+  const [tripError, setTripError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const today = todayDateInputValue()
   const [customerForm, setCustomerForm] = useState({
     company: '',
     contactName: '',
@@ -76,14 +99,37 @@ export default function CustomerRouteTripManagement() {
 
   const addCustomer = (event) => {
     event.preventDefault()
+    setCustomerError('')
 
-    if (!customerForm.company || !customerForm.contactName || !customerForm.phone) return
+    const sanitizedForm = trimFormValues(customerForm)
+    const companyError = validateCompanyName(sanitizedForm.company)
+    const contactError = validatePersonName(sanitizedForm.contactName, 'Contact name')
+    const phoneError = validatePhone(sanitizedForm.phone)
+    const emailError = validateOptionalEmail(sanitizedForm.email)
+
+    if (companyError || contactError || phoneError || emailError) {
+      setCustomerError(companyError || contactError || phoneError || emailError)
+      return
+    }
+
+    if (!customerFormStatusOptions.includes(sanitizedForm.status)) {
+      setCustomerError('Choose a valid customer status.')
+      return
+    }
+
+    const phoneExists = customers.some((customer) => normalizePhone(customer.phone) === normalizePhone(sanitizedForm.phone))
+    if (phoneExists) {
+      setCustomerError('A customer with that phone number already exists.')
+      return
+    }
 
     setCustomers((currentCustomers) => [
       ...currentCustomers,
       {
         id: nextId('CUS', currentCustomers),
-        ...customerForm,
+        ...sanitizedForm,
+        phone: formatPhone(sanitizedForm.phone),
+        email: sanitizedForm.email.toLowerCase(),
       },
     ])
     setCustomerForm({ company: '', contactName: '', phone: '', email: '', status: 'Active' })
@@ -91,16 +137,37 @@ export default function CustomerRouteTripManagement() {
 
   const addRoute = (event) => {
     event.preventDefault()
+    setRouteError('')
 
-    if (!routeForm.name || !routeForm.origin || !routeForm.destination) return
+    const sanitizedForm = trimFormValues(routeForm)
+    const nameError = validateBusinessText(sanitizedForm.name, 'Route name', { min: 3, max: 100 })
+    const originError = validateLocation(sanitizedForm.origin, 'Origin')
+    const destinationError = validateLocation(sanitizedForm.destination, 'Destination')
+    const distance = parseBoundedNumber(sanitizedForm.distanceMiles, 'Distance miles', { min: 1, max: 10000 })
+    const hours = parseBoundedNumber(sanitizedForm.estimatedHours, 'Estimated hours', { min: 0.25, max: 240 })
+
+    if (nameError || originError || destinationError || distance.error || hours.error) {
+      setRouteError(nameError || originError || destinationError || distance.error || hours.error)
+      return
+    }
+
+    if (sanitizedForm.origin.toLowerCase() === sanitizedForm.destination.toLowerCase()) {
+      setRouteError('Origin and destination must be different.')
+      return
+    }
+
+    if (!routeFormStatusOptions.includes(sanitizedForm.status)) {
+      setRouteError('Choose a valid route status.')
+      return
+    }
 
     setRoutes((currentRoutes) => [
       ...currentRoutes,
       {
         id: nextId('RTE', currentRoutes),
-        ...routeForm,
-        distanceMiles: Number(routeForm.distanceMiles) || 0,
-        estimatedHours: Number(routeForm.estimatedHours) || 0,
+        ...sanitizedForm,
+        distanceMiles: distance.value,
+        estimatedHours: hours.value,
       },
     ])
     setRouteForm({ name: '', origin: '', destination: '', distanceMiles: '', estimatedHours: '', status: 'Draft' })
@@ -108,17 +175,70 @@ export default function CustomerRouteTripManagement() {
 
   const addTrip = (event) => {
     event.preventDefault()
+    setTripError('')
 
-    if (!tripForm.customer || !tripForm.route || !tripForm.scheduledDate) return
+    const sanitizedForm = trimFormValues(tripForm)
+    const customerErrorMessage = validateCompanyName(sanitizedForm.customer, 'Customer')
+    const routeErrorMessage = validateBusinessText(sanitizedForm.route, 'Route', { min: 3, max: 100 })
+    const vehicleErrorMessage = validateBusinessText(sanitizedForm.vehicle, 'Vehicle', { min: 2, max: 40 })
+    const driverErrorMessage = validatePersonName(sanitizedForm.driver, 'Driver')
+
+    if (customerErrorMessage || routeErrorMessage || vehicleErrorMessage || driverErrorMessage) {
+      setTripError(customerErrorMessage || routeErrorMessage || vehicleErrorMessage || driverErrorMessage)
+      return
+    }
+
+    if (!sanitizedForm.scheduledDate) {
+      setTripError('Scheduled date is required.')
+      return
+    }
+
+    if (isBeforeToday(sanitizedForm.scheduledDate)) {
+      setTripError('Scheduled date cannot be in the past.')
+      return
+    }
+
+    if (!tripFormStatusOptions.includes(sanitizedForm.status)) {
+      setTripError('Choose a valid trip status.')
+      return
+    }
 
     setTrips((currentTrips) => [
       ...currentTrips,
       {
         id: nextId('TRP', currentTrips),
-        ...tripForm,
+        ...sanitizedForm,
       },
     ])
     setTripForm({ customer: '', route: '', vehicle: '', driver: '', scheduledDate: '', status: 'Scheduled' })
+  }
+
+  const requestDelete = (type, record) => {
+    const labels = {
+      customer: record.company,
+      route: record.name,
+      trip: record.id,
+    }
+
+    setDeleteTarget({ type, id: record.id, label: labels[type] })
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+
+    if (deleteTarget.type === 'customer') {
+      setCustomers((currentCustomers) => currentCustomers.filter((customer) => customer.id !== deleteTarget.id))
+    }
+
+    if (deleteTarget.type === 'route') {
+      setRoutes((currentRoutes) => currentRoutes.filter((route) => route.id !== deleteTarget.id))
+    }
+
+    if (deleteTarget.type === 'trip') {
+      setTrips((currentTrips) => currentTrips.filter((trip) => trip.id !== deleteTarget.id))
+    }
+
+    setDeleteTarget(null)
   }
 
   const customerColumns = [
@@ -134,6 +254,16 @@ export default function CustomerRouteTripManagement() {
       key: 'status',
       label: 'Status',
       render: (customer) => <StatusBadge status={customer.status} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      className: 'cell-actions',
+      render: (customer) => (
+        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('customer', customer)}>
+          Remove
+        </button>
+      ),
     },
   ]
 
@@ -155,6 +285,16 @@ export default function CustomerRouteTripManagement() {
       label: 'Status',
       render: (route) => <StatusBadge status={route.status} />,
     },
+    {
+      key: 'actions',
+      label: 'Actions',
+      className: 'cell-actions',
+      render: (route) => (
+        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('route', route)}>
+          Remove
+        </button>
+      ),
+    },
   ]
 
   const tripColumns = [
@@ -171,6 +311,16 @@ export default function CustomerRouteTripManagement() {
       label: 'Status',
       render: (trip) => <StatusBadge status={trip.status} />,
     },
+    {
+      key: 'actions',
+      label: 'Actions',
+      className: 'cell-actions',
+      render: (trip) => (
+        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('trip', trip)}>
+          Remove
+        </button>
+      ),
+    },
   ]
 
   const activeCustomers = customers.filter((customer) => customer.status === 'Active').length
@@ -180,16 +330,16 @@ export default function CustomerRouteTripManagement() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Milestone 3"
-        title="Customer, Route & Trip Management"
-        description="Manage demo customer, route, and trip records with local frontend state."
+        eyebrow="Network Planning"
+        title="Customers, Routes & Trips"
+        description="Manage customer accounts, route definitions, and scheduled trips."
       />
 
       <section className="stat-grid" aria-label="Customer route trip summary">
         <StatCard label="Customers" value={customers.length} helper={`${activeCustomers} active`} tone="info" />
         <StatCard label="Routes" value={routes.length} helper={`${activeRoutes} active`} tone="success" />
         <StatCard label="Trips" value={trips.length} helper={`${scheduledTrips} scheduled`} tone="info" />
-        <StatCard label="Data mode" value="Mock" helper="Local state only" tone="neutral" />
+        <StatCard label="Planning" value="Live" helper="Operational workspace" tone="neutral" />
       </section>
 
       <section className="split-layout split-layout-wide">
@@ -216,13 +366,15 @@ export default function CustomerRouteTripManagement() {
         </Card>
 
         <Card eyebrow="Add customer" title="New customer record">
-          <form className="form-grid form-grid-single" onSubmit={addCustomer}>
+          <form className="form-grid form-grid-single" onSubmit={addCustomer} noValidate>
             <Field label="Company">
               <input
                 className="form-control"
                 value={customerForm.company}
                 onChange={(event) => setCustomerForm({ ...customerForm, company: event.target.value })}
                 placeholder="Customer company"
+                maxLength="100"
+                required
               />
             </Field>
             <Field label="Contact name">
@@ -231,6 +383,8 @@ export default function CustomerRouteTripManagement() {
                 value={customerForm.contactName}
                 onChange={(event) => setCustomerForm({ ...customerForm, contactName: event.target.value })}
                 placeholder="Primary contact"
+                maxLength="80"
+                required
               />
             </Field>
             <Field label="Phone">
@@ -239,14 +393,20 @@ export default function CustomerRouteTripManagement() {
                 value={customerForm.phone}
                 onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })}
                 placeholder="(555) 000-0000"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength="18"
+                required
               />
             </Field>
             <Field label="Email">
               <input
                 className="form-control"
+                type="email"
                 value={customerForm.email}
                 onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })}
                 placeholder="ops@example.com"
+                maxLength="120"
               />
             </Field>
             <Field label="Status">
@@ -254,12 +414,14 @@ export default function CustomerRouteTripManagement() {
                 className="form-control"
                 value={customerForm.status}
                 onChange={(event) => setCustomerForm({ ...customerForm, status: event.target.value })}
+                required
               >
-                <option>Active</option>
-                <option>Inactive</option>
-                <option>Needs Review</option>
+                {customerFormStatusOptions.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
               </select>
             </Field>
+            {customerError ? <p className="auth-error">{customerError}</p> : null}
             <button className="button button-primary" type="submit">
               Add customer
             </button>
@@ -291,13 +453,15 @@ export default function CustomerRouteTripManagement() {
         </Card>
 
         <Card eyebrow="Add route" title="New route record">
-          <form className="form-grid form-grid-single" onSubmit={addRoute}>
+          <form className="form-grid form-grid-single" onSubmit={addRoute} noValidate>
             <Field label="Route name">
               <input
                 className="form-control"
                 value={routeForm.name}
                 onChange={(event) => setRouteForm({ ...routeForm, name: event.target.value })}
                 placeholder="Dallas to Atlanta"
+                maxLength="100"
+                required
               />
             </Field>
             <Field label="Origin">
@@ -306,6 +470,8 @@ export default function CustomerRouteTripManagement() {
                 value={routeForm.origin}
                 onChange={(event) => setRouteForm({ ...routeForm, origin: event.target.value })}
                 placeholder="Origin city/state"
+                maxLength="80"
+                required
               />
             </Field>
             <Field label="Destination">
@@ -314,25 +480,36 @@ export default function CustomerRouteTripManagement() {
                 value={routeForm.destination}
                 onChange={(event) => setRouteForm({ ...routeForm, destination: event.target.value })}
                 placeholder="Destination city/state"
+                maxLength="80"
+                required
               />
             </Field>
             <Field label="Distance miles">
               <input
                 className="form-control"
                 type="number"
+                min="1"
+                max="10000"
+                step="1"
+                inputMode="numeric"
                 value={routeForm.distanceMiles}
                 onChange={(event) => setRouteForm({ ...routeForm, distanceMiles: event.target.value })}
                 placeholder="500"
+                required
               />
             </Field>
             <Field label="Estimated hours">
               <input
                 className="form-control"
                 type="number"
-                step="0.5"
+                min="0.25"
+                max="240"
+                step="0.25"
+                inputMode="decimal"
                 value={routeForm.estimatedHours}
                 onChange={(event) => setRouteForm({ ...routeForm, estimatedHours: event.target.value })}
                 placeholder="8.5"
+                required
               />
             </Field>
             <Field label="Status">
@@ -340,12 +517,14 @@ export default function CustomerRouteTripManagement() {
                 className="form-control"
                 value={routeForm.status}
                 onChange={(event) => setRouteForm({ ...routeForm, status: event.target.value })}
+                required
               >
-                <option>Active</option>
-                <option>Draft</option>
-                <option>Needs Review</option>
+                {routeFormStatusOptions.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
               </select>
             </Field>
+            {routeError ? <p className="auth-error">{routeError}</p> : null}
             <button className="button button-primary" type="submit">
               Add route
             </button>
@@ -377,13 +556,15 @@ export default function CustomerRouteTripManagement() {
         </Card>
 
         <Card eyebrow="Add trip" title="New trip record">
-          <form className="form-grid form-grid-single" onSubmit={addTrip}>
+          <form className="form-grid form-grid-single" onSubmit={addTrip} noValidate>
             <Field label="Customer">
               <input
                 className="form-control"
                 value={tripForm.customer}
                 onChange={(event) => setTripForm({ ...tripForm, customer: event.target.value })}
                 placeholder="Customer company"
+                maxLength="100"
+                required
               />
             </Field>
             <Field label="Route">
@@ -392,6 +573,8 @@ export default function CustomerRouteTripManagement() {
                 value={tripForm.route}
                 onChange={(event) => setTripForm({ ...tripForm, route: event.target.value })}
                 placeholder="Route name"
+                maxLength="100"
+                required
               />
             </Field>
             <Field label="Vehicle">
@@ -400,6 +583,8 @@ export default function CustomerRouteTripManagement() {
                 value={tripForm.vehicle}
                 onChange={(event) => setTripForm({ ...tripForm, vehicle: event.target.value })}
                 placeholder="Vehicle unit"
+                maxLength="40"
+                required
               />
             </Field>
             <Field label="Driver">
@@ -408,26 +593,31 @@ export default function CustomerRouteTripManagement() {
                 value={tripForm.driver}
                 onChange={(event) => setTripForm({ ...tripForm, driver: event.target.value })}
                 placeholder="Driver name"
+                maxLength="80"
+                required
               />
             </Field>
             <Field label="Scheduled date">
               <input
                 className="form-control"
                 type="date"
+                min={today}
                 value={tripForm.scheduledDate}
                 onChange={(event) => setTripForm({ ...tripForm, scheduledDate: event.target.value })}
+                required
               />
             </Field>
+            {tripError ? <p className="auth-error">{tripError}</p> : null}
             <Field label="Status">
               <select
                 className="form-control"
                 value={tripForm.status}
                 onChange={(event) => setTripForm({ ...tripForm, status: event.target.value })}
+                required
               >
-                <option>Scheduled</option>
-                <option>In Transit</option>
-                <option>Delayed</option>
-                <option>Completed</option>
+                {tripFormStatusOptions.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
               </select>
             </Field>
             <button className="button button-primary" type="submit">
@@ -436,6 +626,16 @@ export default function CustomerRouteTripManagement() {
           </form>
         </Card>
       </section>
+
+      {deleteTarget ? (
+        <ConfirmModal
+          title={`Remove ${deleteTarget.type}?`}
+          message={`Are you sure you want to remove "${deleteTarget.label}"? This action cannot be undone.`}
+          confirmLabel="Remove"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      ) : null}
     </div>
   )
 }
