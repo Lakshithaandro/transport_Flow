@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Card from '../components/ui/Card.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
 import Field from '../components/ui/Field.jsx'
@@ -7,8 +8,8 @@ import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
 import useAuth from '../context/useAuth.js'
-import { initialDrivers, initialVehicles } from '../data/vehicleDriverData.js'
 import { fuelMaintenanceApi } from '../services/fuelMaintenanceApi.js'
+import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
 import { isAfterDate, isBeforeToday, todayDateInputValue } from '../utils/date.js'
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -57,6 +58,8 @@ export default function FuelMaintenanceManagement() {
   const { getAuthToken } = useAuth()
   const [fuelLogs, setFuelLogs] = useState([])
   const [maintenanceRecords, setMaintenanceRecords] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [drivers, setDrivers] = useState([])
   const [summary, setSummary] = useState({
     totalFuelCost: 0,
     averageMileage: 0,
@@ -71,7 +74,10 @@ export default function FuelMaintenanceManagement() {
   const [maintenanceQuery, setMaintenanceQuery] = useState('')
   const [maintenanceStatusFilter, setMaintenanceStatusFilter] = useState('All')
   const [isLoading, setIsLoading] = useState(true)
+  const [isFuelSaving, setIsFuelSaving] = useState(false)
+  const [isMaintenanceSaving, setIsMaintenanceSaving] = useState(false)
   const [error, setError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
   const today = todayDateInputValue()
 
   const loadFuelMaintenanceData = async () => {
@@ -79,14 +85,18 @@ export default function FuelMaintenanceManagement() {
     setError('')
 
     try {
-      const [fuelData, maintenanceData, summaryData] = await Promise.all([
+      const [fuelData, maintenanceData, summaryData, vehicleData, driverData] = await Promise.all([
         fuelMaintenanceApi.getFuelLogs(getAuthToken),
         fuelMaintenanceApi.getMaintenanceRecords(getAuthToken),
         fuelMaintenanceApi.getSummary(getAuthToken),
+        vehicleDriverApi.getVehicles(getAuthToken),
+        vehicleDriverApi.getDrivers(getAuthToken),
       ])
       setFuelLogs(fuelData)
       setMaintenanceRecords(maintenanceData)
       setSummary(summaryData)
+      setVehicles(vehicleData)
+      setDrivers(driverData)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -101,18 +111,19 @@ export default function FuelMaintenanceManagement() {
   }, [])
 
   const handleVehicleSelection = (vehicleId, setter, currentForm) => {
-    const vehicle = initialVehicles.find((item) => item.id === vehicleId)
+    const vehicle = vehicles.find((item) => getRecordId(item) === vehicleId)
     setter({ ...currentForm, vehicleId, vehicleName: vehicle?.unit || '' })
   }
 
   const handleDriverSelection = (driverId) => {
-    const driver = initialDrivers.find((item) => item.id === driverId)
+    const driver = drivers.find((item) => getRecordId(item) === driverId)
     setFuelForm({ ...fuelForm, driverId, driverName: driver?.name || '' })
   }
 
   const submitFuelLog = async (event) => {
     event.preventDefault()
     setError('')
+    setSaveMessage('')
 
     if (isBeforeToday(fuelForm.date)) {
       setError('Fuel log date cannot be in the past.')
@@ -126,25 +137,32 @@ export default function FuelMaintenanceManagement() {
       odometerReading: Number(fuelForm.odometerReading),
     }
 
+    setIsFuelSaving(true)
+
     try {
       if (editingFuelId) {
         const updatedFuelLog = await fuelMaintenanceApi.updateFuelLog(editingFuelId, payload, getAuthToken)
         setFuelLogs((currentLogs) => currentLogs.map((log) => (getRecordId(log) === editingFuelId ? updatedFuelLog : log)))
+        setSaveMessage('Fuel log updated successfully.')
       } else {
         const createdFuelLog = await fuelMaintenanceApi.createFuelLog(payload, getAuthToken)
         setFuelLogs((currentLogs) => [createdFuelLog, ...currentLogs])
+        setSaveMessage('Fuel log created successfully.')
       }
       setFuelForm(emptyFuelForm)
       setEditingFuelId(null)
       setSummary(await fuelMaintenanceApi.getSummary(getAuthToken))
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setIsFuelSaving(false)
     }
   }
 
   const submitMaintenanceRecord = async (event) => {
     event.preventDefault()
     setError('')
+    setSaveMessage('')
 
     if (isBeforeToday(maintenanceForm.nextServiceDate)) {
       setError('Next service date cannot be in the past.')
@@ -166,21 +184,27 @@ export default function FuelMaintenanceManagement() {
       cost: Number(maintenanceForm.cost),
     }
 
+    setIsMaintenanceSaving(true)
+
     try {
       if (editingMaintenanceId) {
         const updatedRecord = await fuelMaintenanceApi.updateMaintenanceRecord(editingMaintenanceId, payload, getAuthToken)
         setMaintenanceRecords((currentRecords) =>
           currentRecords.map((record) => (getRecordId(record) === editingMaintenanceId ? updatedRecord : record)),
         )
+        setSaveMessage('Maintenance record updated successfully.')
       } else {
         const createdRecord = await fuelMaintenanceApi.createMaintenanceRecord(payload, getAuthToken)
         setMaintenanceRecords((currentRecords) => [createdRecord, ...currentRecords])
+        setSaveMessage('Maintenance record created successfully.')
       }
       setMaintenanceForm(emptyMaintenanceForm)
       setEditingMaintenanceId(null)
       setSummary(await fuelMaintenanceApi.getSummary(getAuthToken))
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setIsMaintenanceSaving(false)
     }
   }
 
@@ -217,10 +241,12 @@ export default function FuelMaintenanceManagement() {
 
   const deleteFuelLog = async (id) => {
     setError('')
+    setSaveMessage('')
     try {
       await fuelMaintenanceApi.deleteFuelLog(id, getAuthToken)
       setFuelLogs((currentLogs) => currentLogs.filter((log) => getRecordId(log) !== id))
       setSummary(await fuelMaintenanceApi.getSummary(getAuthToken))
+      setSaveMessage('Fuel log deleted successfully.')
     } catch (requestError) {
       setError(requestError.message)
     }
@@ -228,10 +254,12 @@ export default function FuelMaintenanceManagement() {
 
   const deleteMaintenanceRecord = async (id) => {
     setError('')
+    setSaveMessage('')
     try {
       await fuelMaintenanceApi.deleteMaintenanceRecord(id, getAuthToken)
       setMaintenanceRecords((currentRecords) => currentRecords.filter((record) => getRecordId(record) !== id))
       setSummary(await fuelMaintenanceApi.getSummary(getAuthToken))
+      setSaveMessage('Maintenance record deleted successfully.')
     } catch (requestError) {
       setError(requestError.message)
     }
@@ -266,6 +294,7 @@ export default function FuelMaintenanceManagement() {
       render: (fuelLog) => (
         <div className="inline-group">
           <button className="button button-secondary button-small" type="button" onClick={() => editFuelLog(fuelLog)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
             Edit
           </button>
           <button className="button button-secondary button-small" type="button" onClick={() => deleteFuelLog(getRecordId(fuelLog))}>
@@ -290,6 +319,7 @@ export default function FuelMaintenanceManagement() {
       render: (record) => (
         <div className="inline-group">
           <button className="button button-secondary button-small" type="button" onClick={() => editMaintenanceRecord(record)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
             Edit
           </button>
           <button className="button button-secondary button-small" type="button" onClick={() => deleteMaintenanceRecord(getRecordId(record))}>
@@ -309,6 +339,7 @@ export default function FuelMaintenanceManagement() {
       />
 
       {error ? <p className="auth-error">{error}</p> : null}
+      {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
       {isLoading ? <Card title="Loading records"><p>Preparing fuel and maintenance records.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Fuel and maintenance summary">
@@ -328,16 +359,16 @@ export default function FuelMaintenanceManagement() {
                 onChange={(event) => handleVehicleSelection(event.target.value, setFuelForm, fuelForm)}
               >
                 <option value="">Select vehicle</option>
-                {initialVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>{vehicle.unit}</option>
+                {vehicles.map((vehicle) => (
+                  <option key={getRecordId(vehicle)} value={getRecordId(vehicle)}>{vehicle.unit}</option>
                 ))}
               </select>
             </Field>
             <Field label="Driver">
               <select className="form-control" value={fuelForm.driverId} onChange={(event) => handleDriverSelection(event.target.value)}>
                 <option value="">Select driver</option>
-                {initialDrivers.map((driver) => (
-                  <option key={driver.id} value={driver.id}>{driver.name}</option>
+                {drivers.map((driver) => (
+                  <option key={getRecordId(driver)} value={getRecordId(driver)}>{driver.name}</option>
                 ))}
               </select>
             </Field>
@@ -360,8 +391,8 @@ export default function FuelMaintenanceManagement() {
               <textarea className="form-control textarea-control" rows="3" value={fuelForm.notes} onChange={(event) => setFuelForm({ ...fuelForm, notes: event.target.value })} />
             </Field>
             <div className="inline-group">
-              <button className="button button-primary" type="submit">{editingFuelId ? 'Update fuel log' : 'Create fuel log'}</button>
-              {editingFuelId ? <button className="button button-secondary" type="button" onClick={() => { setEditingFuelId(null); setFuelForm(emptyFuelForm) }}>Cancel</button> : null}
+              <button className="button button-primary" type="submit" disabled={isFuelSaving}>{isFuelSaving ? 'Saving...' : editingFuelId ? 'Update fuel log' : 'Create fuel log'}</button>
+              {editingFuelId ? <button className="button button-secondary" type="button" disabled={isFuelSaving} onClick={() => { setEditingFuelId(null); setFuelForm(emptyFuelForm) }}>Cancel</button> : null}
             </div>
           </form>
         </Card>
@@ -375,8 +406,8 @@ export default function FuelMaintenanceManagement() {
                 onChange={(event) => handleVehicleSelection(event.target.value, setMaintenanceForm, maintenanceForm)}
               >
                 <option value="">Select vehicle</option>
-                {initialVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>{vehicle.unit}</option>
+                {vehicles.map((vehicle) => (
+                  <option key={getRecordId(vehicle)} value={getRecordId(vehicle)}>{vehicle.unit}</option>
                 ))}
               </select>
             </Field>
@@ -404,8 +435,8 @@ export default function FuelMaintenanceManagement() {
               <textarea className="form-control textarea-control" rows="3" value={maintenanceForm.notes} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, notes: event.target.value })} />
             </Field>
             <div className="inline-group">
-              <button className="button button-primary" type="submit">{editingMaintenanceId ? 'Update maintenance' : 'Create maintenance'}</button>
-              {editingMaintenanceId ? <button className="button button-secondary" type="button" onClick={() => { setEditingMaintenanceId(null); setMaintenanceForm(emptyMaintenanceForm) }}>Cancel</button> : null}
+              <button className="button button-primary" type="submit" disabled={isMaintenanceSaving}>{isMaintenanceSaving ? 'Saving...' : editingMaintenanceId ? 'Update maintenance' : 'Create maintenance'}</button>
+              {editingMaintenanceId ? <button className="button button-secondary" type="button" disabled={isMaintenanceSaving} onClick={() => { setEditingMaintenanceId(null); setMaintenanceForm(emptyMaintenanceForm) }}>Cancel</button> : null}
             </div>
           </form>
         </Card>

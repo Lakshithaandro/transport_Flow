@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Card from '../components/ui/Card.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
 import Field from '../components/ui/Field.jsx'
@@ -7,9 +8,9 @@ import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
 import useAuth from '../context/useAuth.js'
-import { initialCustomers, initialTrips } from '../data/customerRouteTripData.js'
-import { initialVehicles } from '../data/vehicleDriverData.js'
+import { customerRouteTripApi } from '../services/customerRouteTripApi.js'
 import { invoiceApi } from '../services/invoiceApi.js'
+import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
 import { isAfterDate, isBeforeToday, todayDateInputValue } from '../utils/date.js'
 import { exportInvoicePdf } from '../utils/invoicePdf.js'
 
@@ -72,6 +73,9 @@ function calculateInvoicePreview(form) {
 export default function InvoicePaymentManagement() {
   const { getAuthToken } = useAuth()
   const [invoices, setInvoices] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [trips, setTrips] = useState([])
+  const [vehicles, setVehicles] = useState([])
   const [summary, setSummary] = useState({
     totalRevenue: 0,
     paidRevenue: 0,
@@ -84,7 +88,9 @@ export default function InvoicePaymentManagement() {
   const [invoiceQuery, setInvoiceQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
   const today = todayDateInputValue()
 
   const loadInvoices = async () => {
@@ -92,14 +98,20 @@ export default function InvoicePaymentManagement() {
     setError('')
 
     try {
-      const [invoiceData, summaryData, numberData] = await Promise.all([
+      const [invoiceData, summaryData, numberData, customerData, tripData, vehicleData] = await Promise.all([
         invoiceApi.getInvoices(getAuthToken),
         invoiceApi.getRevenueSummary(getAuthToken),
         invoiceApi.getNextInvoiceNumber(getAuthToken),
+        customerRouteTripApi.getCustomers(getAuthToken),
+        customerRouteTripApi.getTrips(getAuthToken),
+        vehicleDriverApi.getVehicles(getAuthToken),
       ])
       setInvoices(invoiceData)
       setSummary(summaryData)
       setNextInvoiceNumber(numberData.invoiceNumber)
+      setCustomers(customerData)
+      setTrips(tripData)
+      setVehicles(vehicleData)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -137,7 +149,7 @@ export default function InvoicePaymentManagement() {
   }
 
   const selectCustomer = (customerId) => {
-    const customer = initialCustomers.find((item) => item.id === customerId)
+    const customer = customers.find((item) => getRecordId(item) === customerId)
     setInvoiceForm({
       ...invoiceForm,
       customerId,
@@ -147,16 +159,16 @@ export default function InvoicePaymentManagement() {
   }
 
   const selectTrip = (tripId) => {
-    const trip = initialTrips.find((item) => item.id === tripId)
+    const trip = trips.find((item) => getRecordId(item) === tripId)
     setInvoiceForm({
       ...invoiceForm,
       tripId,
-      tripName: trip ? `${trip.id} - ${trip.route}` : '',
+      tripName: trip ? `${trip.route} - ${toDateInputValue(trip.scheduledDate)}` : '',
     })
   }
 
   const selectVehicle = (vehicleId) => {
-    const vehicle = initialVehicles.find((item) => item.id === vehicleId)
+    const vehicle = vehicles.find((item) => getRecordId(item) === vehicleId)
     setInvoiceForm({
       ...invoiceForm,
       vehicleId,
@@ -178,6 +190,7 @@ export default function InvoicePaymentManagement() {
   const submitInvoice = async (event) => {
     event.preventDefault()
     setError('')
+    setSaveMessage('')
 
     if (!invoiceForm.customerId || !invoiceForm.tripId || !invoiceForm.vehicleId) {
       setError('Customer, trip, and vehicle selections are required.')
@@ -218,18 +231,24 @@ export default function InvoicePaymentManagement() {
       paymentDate: invoiceForm.paymentDate || null,
     }
 
+    setIsSaving(true)
+
     try {
       if (editingInvoiceId) {
         const updatedInvoice = await invoiceApi.updateInvoice(editingInvoiceId, payload, getAuthToken)
         setInvoices((currentInvoices) => currentInvoices.map((invoice) => (getRecordId(invoice) === editingInvoiceId ? updatedInvoice : invoice)))
+        setSaveMessage('Invoice updated successfully.')
       } else {
         const createdInvoice = await invoiceApi.createInvoice(payload, getAuthToken)
         setInvoices((currentInvoices) => [createdInvoice, ...currentInvoices])
+        setSaveMessage('Invoice created successfully.')
       }
       setSummary(await invoiceApi.getRevenueSummary(getAuthToken))
       await resetForm()
     } catch (requestError) {
       setError(requestError.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -264,10 +283,12 @@ export default function InvoicePaymentManagement() {
 
   const deleteInvoice = async (id) => {
     setError('')
+    setSaveMessage('')
     try {
       await invoiceApi.deleteInvoice(id, getAuthToken)
       setInvoices((currentInvoices) => currentInvoices.filter((invoice) => getRecordId(invoice) !== id))
       setSummary(await invoiceApi.getRevenueSummary(getAuthToken))
+      setSaveMessage('Invoice deleted successfully.')
     } catch (requestError) {
       setError(requestError.message)
     }
@@ -294,7 +315,10 @@ export default function InvoicePaymentManagement() {
       label: 'Actions',
       render: (invoice) => (
         <div className="inline-group">
-          <button className="button button-secondary button-small" type="button" onClick={() => editInvoice(invoice)}>Edit</button>
+          <button className="button button-secondary button-small" type="button" onClick={() => editInvoice(invoice)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
           <button className="button button-secondary button-small" type="button" onClick={() => exportInvoicePdf(invoice)}>Export PDF</button>
           <button className="button button-secondary button-small" type="button" onClick={() => deleteInvoice(getRecordId(invoice))}>Delete</button>
         </div>
@@ -311,6 +335,7 @@ export default function InvoicePaymentManagement() {
       />
 
       {error ? <p className="auth-error">{error}</p> : null}
+      {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
       {isLoading ? <Card title="Loading invoices"><p>Fetching invoices and revenue dashboard from the backend API.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Revenue dashboard">
@@ -372,19 +397,19 @@ export default function InvoicePaymentManagement() {
             <Field label="Customer Selection">
               <select className="form-control" value={invoiceForm.customerId} onChange={(event) => selectCustomer(event.target.value)} required>
                 <option value="">Select customer</option>
-                {initialCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.company}</option>)}
+                {customers.map((customer) => <option key={getRecordId(customer)} value={getRecordId(customer)}>{customer.company}</option>)}
               </select>
             </Field>
             <Field label="Trip Selection">
               <select className="form-control" value={invoiceForm.tripId} onChange={(event) => selectTrip(event.target.value)} required>
                 <option value="">Select trip</option>
-                {initialTrips.map((trip) => <option key={trip.id} value={trip.id}>{trip.id} - {trip.route}</option>)}
+                {trips.map((trip) => <option key={getRecordId(trip)} value={getRecordId(trip)}>{trip.route} - {toDateInputValue(trip.scheduledDate)}</option>)}
               </select>
             </Field>
             <Field label="Vehicle Selection">
               <select className="form-control" value={invoiceForm.vehicleId} onChange={(event) => selectVehicle(event.target.value)} required>
                 <option value="">Select vehicle</option>
-                {initialVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.unit}</option>)}
+                {vehicles.map((vehicle) => <option key={getRecordId(vehicle)} value={getRecordId(vehicle)}>{vehicle.unit}</option>)}
               </select>
             </Field>
             <Field label="Payment Method">
@@ -446,8 +471,8 @@ export default function InvoicePaymentManagement() {
           </Field>
 
           <div className="inline-group">
-            <button className="button button-primary" type="submit">{editingInvoiceId ? 'Update invoice' : 'Create invoice'}</button>
-            {editingInvoiceId ? <button className="button button-secondary" type="button" onClick={resetForm}>Cancel edit</button> : null}
+            <button className="button button-primary" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : editingInvoiceId ? 'Update invoice' : 'Create invoice'}</button>
+            {editingInvoiceId ? <button className="button button-secondary" type="button" onClick={resetForm} disabled={isSaving}>Cancel edit</button> : null}
           </div>
         </form>
       </Card>

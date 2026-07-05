@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 
+<<<<<<< HEAD
 const driverDocumentSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -10,6 +11,8 @@ const driverDocumentSchema = new mongoose.Schema(
   { _id: false },
 )
 
+=======
+>>>>>>> milestone7
 const driverSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -17,10 +20,13 @@ const driverSchema = new mongoose.Schema(
     phone: { type: String, required: true, trim: true },
     status: { type: String, enum: ['Available', 'Assigned', 'Needs Review'], default: 'Available' },
     assignedVehicle: { type: String, default: 'Unassigned', trim: true },
+<<<<<<< HEAD
     licenseExpiry: { type: String, default: '', trim: true },
     emergencyContactName: { type: String, default: '', trim: true },
     emergencyContactPhone: { type: String, default: '', trim: true },
     documents: { type: [driverDocumentSchema], default: [] },
+=======
+>>>>>>> milestone7
     createdByUid: { type: String, required: true, index: true },
     createdByEmail: { type: String, default: '' },
   },
@@ -29,6 +35,9 @@ const driverSchema = new mongoose.Schema(
 
 driverSchema.index({ createdByUid: 1, phone: 1 }, { unique: true })
 driverSchema.index({ createdByUid: 1, status: 1 })
+<<<<<<< HEAD
 driverSchema.index({ createdByUid: 1, licenseExpiry: 1 })
+=======
+>>>>>>> milestone7
 
 export default mongoose.model('Driver', driverSchema)

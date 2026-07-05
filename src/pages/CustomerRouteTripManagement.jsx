@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import Card from '../components/ui/Card.jsx'
 import ConfirmModal from '../components/ui/ConfirmModal.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
@@ -7,7 +8,8 @@ import PageHeader from '../components/ui/PageHeader.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Toolbar from '../components/ui/Toolbar.jsx'
-import { initialCustomers, initialRoutes, initialTrips } from '../data/customerRouteTripData.js'
+import useAuth from '../context/useAuth.js'
+import { customerRouteTripApi } from '../services/customerRouteTripApi.js'
 import { isBeforeToday, todayDateInputValue } from '../utils/date.js'
 import {
   formatPhone,
@@ -28,16 +30,28 @@ const tripStatusOptions = ['All', 'Scheduled', 'In Transit', 'Delayed', 'Complet
 const customerFormStatusOptions = ['Active', 'Inactive', 'Needs Review']
 const routeFormStatusOptions = ['Active', 'Draft', 'Needs Review']
 const tripFormStatusOptions = ['Scheduled', 'In Transit', 'Delayed', 'Completed']
+const emptyCustomerForm = { company: '', contactName: '', phone: '', email: '', status: 'Active' }
+const emptyRouteForm = { name: '', origin: '', destination: '', distanceMiles: '', estimatedHours: '', status: 'Draft' }
+const emptyTripForm = { customer: '', route: '', vehicle: '', driver: '', scheduledDate: '', status: 'Scheduled' }
 
-function nextId(prefix, records) {
-  const nextNumber = Math.max(0, ...records.map((record) => Number(String(record.id).replace(`${prefix}-`, '')) || 0)) + 1
-  return `${prefix}-${String(nextNumber).padStart(3, '0')}`
+function getRecordId(record) {
+  return record._id || record.id
+}
+
+function toDateInputValue(value) {
+  if (!value) return ''
+  return new Date(value).toISOString().slice(0, 10)
+}
+
+function tripLabel(trip) {
+  return trip.id || `TRP-${String(getRecordId(trip)).slice(-6).toUpperCase()}`
 }
 
 export default function CustomerRouteTripManagement() {
-  const [customers, setCustomers] = useState(initialCustomers)
-  const [routes, setRoutes] = useState(initialRoutes)
-  const [trips, setTrips] = useState(initialTrips)
+  const { getAuthToken } = useAuth()
+  const [customers, setCustomers] = useState([])
+  const [routes, setRoutes] = useState([])
+  const [trips, setTrips] = useState([])
   const [customerQuery, setCustomerQuery] = useState('')
   const [routeQuery, setRouteQuery] = useState('')
   const [tripQuery, setTripQuery] = useState('')
@@ -47,31 +61,46 @@ export default function CustomerRouteTripManagement() {
   const [customerError, setCustomerError] = useState('')
   const [routeError, setRouteError] = useState('')
   const [tripError, setTripError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isCustomerSaving, setIsCustomerSaving] = useState(false)
+  const [isRouteSaving, setIsRouteSaving] = useState(false)
+  const [isTripSaving, setIsTripSaving] = useState(false)
+  const [editingCustomerId, setEditingCustomerId] = useState(null)
+  const [editingRouteId, setEditingRouteId] = useState(null)
+  const [editingTripId, setEditingTripId] = useState(null)
   const today = todayDateInputValue()
-  const [customerForm, setCustomerForm] = useState({
-    company: '',
-    contactName: '',
-    phone: '',
-    email: '',
-    status: 'Active',
-  })
-  const [routeForm, setRouteForm] = useState({
-    name: '',
-    origin: '',
-    destination: '',
-    distanceMiles: '',
-    estimatedHours: '',
-    status: 'Draft',
-  })
-  const [tripForm, setTripForm] = useState({
-    customer: '',
-    route: '',
-    vehicle: '',
-    driver: '',
-    scheduledDate: '',
-    status: 'Scheduled',
-  })
+  const [customerForm, setCustomerForm] = useState(emptyCustomerForm)
+  const [routeForm, setRouteForm] = useState(emptyRouteForm)
+  const [tripForm, setTripForm] = useState(emptyTripForm)
+
+  const loadNetworkRecords = async () => {
+    setIsLoading(true)
+    setLoadError('')
+
+    try {
+      const [customerData, routeData, tripData] = await Promise.all([
+        customerRouteTripApi.getCustomers(getAuthToken),
+        customerRouteTripApi.getRoutes(getAuthToken),
+        customerRouteTripApi.getTrips(getAuthToken),
+      ])
+      setCustomers(customerData)
+      setRoutes(routeData)
+      setTrips(tripData)
+    } catch (requestError) {
+      setLoadError(requestError.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadNetworkRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filteredCustomers = customers.filter((customer) => {
     const searchableText = [customer.company, customer.contactName, customer.phone, customer.email].join(' ').toLowerCase()
@@ -90,16 +119,35 @@ export default function CustomerRouteTripManagement() {
   })
 
   const filteredTrips = trips.filter((trip) => {
-    const searchableText = [trip.customer, trip.route, trip.vehicle, trip.driver, trip.scheduledDate].join(' ').toLowerCase()
+    const searchableText = [trip.customer, trip.route, trip.vehicle, trip.driver, toDateInputValue(trip.scheduledDate), tripLabel(trip)].join(' ').toLowerCase()
     const matchesQuery = searchableText.includes(tripQuery.toLowerCase())
     const matchesStatus = tripStatus === 'All' || trip.status === tripStatus
 
     return matchesQuery && matchesStatus
   })
 
-  const addCustomer = (event) => {
+  const resetCustomerForm = () => {
+    setEditingCustomerId(null)
+    setCustomerForm(emptyCustomerForm)
+    setCustomerError('')
+  }
+
+  const resetRouteForm = () => {
+    setEditingRouteId(null)
+    setRouteForm(emptyRouteForm)
+    setRouteError('')
+  }
+
+  const resetTripForm = () => {
+    setEditingTripId(null)
+    setTripForm(emptyTripForm)
+    setTripError('')
+  }
+
+  const submitCustomer = async (event) => {
     event.preventDefault()
     setCustomerError('')
+    setSaveMessage('')
 
     const sanitizedForm = trimFormValues(customerForm)
     const companyError = validateCompanyName(sanitizedForm.company)
@@ -117,27 +165,41 @@ export default function CustomerRouteTripManagement() {
       return
     }
 
-    const phoneExists = customers.some((customer) => normalizePhone(customer.phone) === normalizePhone(sanitizedForm.phone))
+    const phoneExists = customers.some(
+      (customer) => getRecordId(customer) !== editingCustomerId && normalizePhone(customer.phone) === normalizePhone(sanitizedForm.phone),
+    )
     if (phoneExists) {
       setCustomerError('A customer with that phone number already exists.')
       return
     }
 
-    setCustomers((currentCustomers) => [
-      ...currentCustomers,
-      {
-        id: nextId('CUS', currentCustomers),
-        ...sanitizedForm,
-        phone: formatPhone(sanitizedForm.phone),
-        email: sanitizedForm.email.toLowerCase(),
-      },
-    ])
-    setCustomerForm({ company: '', contactName: '', phone: '', email: '', status: 'Active' })
+    const payload = { ...sanitizedForm, phone: formatPhone(sanitizedForm.phone), email: sanitizedForm.email.toLowerCase() }
+    setIsCustomerSaving(true)
+
+    try {
+      if (editingCustomerId) {
+        const updatedCustomer = await customerRouteTripApi.updateCustomer(editingCustomerId, payload, getAuthToken)
+        setCustomers((currentCustomers) =>
+          currentCustomers.map((customer) => (getRecordId(customer) === editingCustomerId ? updatedCustomer : customer)),
+        )
+        setSaveMessage('Customer updated successfully.')
+      } else {
+        const createdCustomer = await customerRouteTripApi.createCustomer(payload, getAuthToken)
+        setCustomers((currentCustomers) => [...currentCustomers, createdCustomer])
+        setSaveMessage('Customer created successfully.')
+      }
+      resetCustomerForm()
+    } catch (requestError) {
+      setCustomerError(requestError.message)
+    } finally {
+      setIsCustomerSaving(false)
+    }
   }
 
-  const addRoute = (event) => {
+  const submitRoute = async (event) => {
     event.preventDefault()
     setRouteError('')
+    setSaveMessage('')
 
     const sanitizedForm = trimFormValues(routeForm)
     const nameError = validateBusinessText(sanitizedForm.name, 'Route name', { min: 3, max: 100 })
@@ -161,21 +223,31 @@ export default function CustomerRouteTripManagement() {
       return
     }
 
-    setRoutes((currentRoutes) => [
-      ...currentRoutes,
-      {
-        id: nextId('RTE', currentRoutes),
-        ...sanitizedForm,
-        distanceMiles: distance.value,
-        estimatedHours: hours.value,
-      },
-    ])
-    setRouteForm({ name: '', origin: '', destination: '', distanceMiles: '', estimatedHours: '', status: 'Draft' })
+    const payload = { ...sanitizedForm, distanceMiles: distance.value, estimatedHours: hours.value }
+    setIsRouteSaving(true)
+
+    try {
+      if (editingRouteId) {
+        const updatedRoute = await customerRouteTripApi.updateRoute(editingRouteId, payload, getAuthToken)
+        setRoutes((currentRoutes) => currentRoutes.map((route) => (getRecordId(route) === editingRouteId ? updatedRoute : route)))
+        setSaveMessage('Route updated successfully.')
+      } else {
+        const createdRoute = await customerRouteTripApi.createRoute(payload, getAuthToken)
+        setRoutes((currentRoutes) => [...currentRoutes, createdRoute])
+        setSaveMessage('Route created successfully.')
+      }
+      resetRouteForm()
+    } catch (requestError) {
+      setRouteError(requestError.message)
+    } finally {
+      setIsRouteSaving(false)
+    }
   }
 
-  const addTrip = (event) => {
+  const submitTrip = async (event) => {
     event.preventDefault()
     setTripError('')
+    setSaveMessage('')
 
     const sanitizedForm = trimFormValues(tripForm)
     const customerErrorMessage = validateCompanyName(sanitizedForm.customer, 'Customer')
@@ -203,42 +275,109 @@ export default function CustomerRouteTripManagement() {
       return
     }
 
-    setTrips((currentTrips) => [
-      ...currentTrips,
-      {
-        id: nextId('TRP', currentTrips),
-        ...sanitizedForm,
-      },
-    ])
-    setTripForm({ customer: '', route: '', vehicle: '', driver: '', scheduledDate: '', status: 'Scheduled' })
+    setIsTripSaving(true)
+
+    try {
+      if (editingTripId) {
+        const updatedTrip = await customerRouteTripApi.updateTrip(editingTripId, sanitizedForm, getAuthToken)
+        setTrips((currentTrips) => currentTrips.map((trip) => (getRecordId(trip) === editingTripId ? updatedTrip : trip)))
+        setSaveMessage('Trip updated successfully.')
+      } else {
+        const createdTrip = await customerRouteTripApi.createTrip(sanitizedForm, getAuthToken)
+        setTrips((currentTrips) => [...currentTrips, createdTrip])
+        setSaveMessage('Trip created successfully.')
+      }
+      resetTripForm()
+    } catch (requestError) {
+      setTripError(requestError.message)
+    } finally {
+      setIsTripSaving(false)
+    }
+  }
+
+  const editCustomer = (customer) => {
+    setEditingCustomerId(getRecordId(customer))
+    setCustomerError('')
+    setSaveMessage('')
+    setCustomerForm({
+      company: customer.company,
+      contactName: customer.contactName,
+      phone: customer.phone,
+      email: customer.email || '',
+      status: customer.status,
+    })
+  }
+
+  const editRoute = (route) => {
+    setEditingRouteId(getRecordId(route))
+    setRouteError('')
+    setSaveMessage('')
+    setRouteForm({
+      name: route.name,
+      origin: route.origin,
+      destination: route.destination,
+      distanceMiles: route.distanceMiles,
+      estimatedHours: route.estimatedHours,
+      status: route.status,
+    })
+  }
+
+  const editTrip = (trip) => {
+    setEditingTripId(getRecordId(trip))
+    setTripError('')
+    setSaveMessage('')
+    setTripForm({
+      customer: trip.customer,
+      route: trip.route,
+      vehicle: trip.vehicle,
+      driver: trip.driver,
+      scheduledDate: toDateInputValue(trip.scheduledDate),
+      status: trip.status,
+    })
   }
 
   const requestDelete = (type, record) => {
     const labels = {
       customer: record.company,
       route: record.name,
-      trip: record.id,
+      trip: tripLabel(record),
     }
 
-    setDeleteTarget({ type, id: record.id, label: labels[type] })
+    setDeleteTarget({ type, id: getRecordId(record), label: labels[type] })
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return
 
-    if (deleteTarget.type === 'customer') {
-      setCustomers((currentCustomers) => currentCustomers.filter((customer) => customer.id !== deleteTarget.id))
-    }
+    setLoadError('')
+    setSaveMessage('')
 
-    if (deleteTarget.type === 'route') {
-      setRoutes((currentRoutes) => currentRoutes.filter((route) => route.id !== deleteTarget.id))
-    }
+    try {
+      if (deleteTarget.type === 'customer') {
+        await customerRouteTripApi.deleteCustomer(deleteTarget.id, getAuthToken)
+        setCustomers((currentCustomers) => currentCustomers.filter((customer) => getRecordId(customer) !== deleteTarget.id))
+        if (editingCustomerId === deleteTarget.id) resetCustomerForm()
+        setSaveMessage('Customer deleted successfully.')
+      }
 
-    if (deleteTarget.type === 'trip') {
-      setTrips((currentTrips) => currentTrips.filter((trip) => trip.id !== deleteTarget.id))
-    }
+      if (deleteTarget.type === 'route') {
+        await customerRouteTripApi.deleteRoute(deleteTarget.id, getAuthToken)
+        setRoutes((currentRoutes) => currentRoutes.filter((route) => getRecordId(route) !== deleteTarget.id))
+        if (editingRouteId === deleteTarget.id) resetRouteForm()
+        setSaveMessage('Route deleted successfully.')
+      }
 
-    setDeleteTarget(null)
+      if (deleteTarget.type === 'trip') {
+        await customerRouteTripApi.deleteTrip(deleteTarget.id, getAuthToken)
+        setTrips((currentTrips) => currentTrips.filter((trip) => getRecordId(trip) !== deleteTarget.id))
+        if (editingTripId === deleteTarget.id) resetTripForm()
+        setSaveMessage('Trip deleted successfully.')
+      }
+
+      setDeleteTarget(null)
+    } catch (requestError) {
+      setLoadError(requestError.message)
+    }
   }
 
   const customerColumns = [
@@ -260,9 +399,15 @@ export default function CustomerRouteTripManagement() {
       label: 'Actions',
       className: 'cell-actions',
       render: (customer) => (
-        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('customer', customer)}>
-          Remove
-        </button>
+        <div className="inline-group">
+          <button className="button button-secondary button-small" type="button" onClick={() => editCustomer(customer)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
+          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('customer', customer)}>
+            Remove
+          </button>
+        </div>
       ),
     },
   ]
@@ -290,9 +435,15 @@ export default function CustomerRouteTripManagement() {
       label: 'Actions',
       className: 'cell-actions',
       render: (route) => (
-        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('route', route)}>
-          Remove
-        </button>
+        <div className="inline-group">
+          <button className="button button-secondary button-small" type="button" onClick={() => editRoute(route)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
+          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('route', route)}>
+            Remove
+          </button>
+        </div>
       ),
     },
   ]
@@ -301,11 +452,11 @@ export default function CustomerRouteTripManagement() {
     {
       key: 'id',
       label: 'Trip',
-      render: (trip) => <strong className="cell-primary">{trip.id}</strong>,
+      render: (trip) => <strong className="cell-primary">{tripLabel(trip)}</strong>,
     },
     { key: 'customer', label: 'Customer' },
     { key: 'route', label: 'Route' },
-    { key: 'scheduledDate', label: 'Scheduled' },
+    { key: 'scheduledDate', label: 'Scheduled', render: (trip) => toDateInputValue(trip.scheduledDate) },
     {
       key: 'status',
       label: 'Status',
@@ -316,9 +467,15 @@ export default function CustomerRouteTripManagement() {
       label: 'Actions',
       className: 'cell-actions',
       render: (trip) => (
-        <button className="button button-danger button-small" type="button" onClick={() => requestDelete('trip', trip)}>
-          Remove
-        </button>
+        <div className="inline-group">
+          <button className="button button-secondary button-small" type="button" onClick={() => editTrip(trip)}>
+            <Pencil className="lucide-icon" aria-hidden="true" />
+            Edit
+          </button>
+          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('trip', trip)}>
+            Remove
+          </button>
+        </div>
       ),
     },
   ]
@@ -334,6 +491,10 @@ export default function CustomerRouteTripManagement() {
         title="Customers, Routes & Trips"
         description="Manage customer accounts, route definitions, and scheduled trips."
       />
+
+      {loadError ? <p className="auth-error">{loadError}</p> : null}
+      {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
+      {isLoading ? <Card title="Loading network records"><p>Fetching customers, routes, and trips from the backend API.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Customer route trip summary">
         <StatCard label="Customers" value={customers.length} helper={`${activeCustomers} active`} tone="info" />
@@ -362,11 +523,11 @@ export default function CustomerRouteTripManagement() {
               </select>
             </Field>
           </Toolbar>
-          <DataTable columns={customerColumns} rows={filteredCustomers} getRowKey={(customer) => customer.id} />
+          <DataTable columns={customerColumns} rows={filteredCustomers} getRowKey={getRecordId} />
         </Card>
 
-        <Card eyebrow="Add customer" title="New customer record">
-          <form className="form-grid form-grid-single" onSubmit={addCustomer} noValidate>
+        <Card eyebrow={editingCustomerId ? 'Edit customer' : 'Add customer'} title={editingCustomerId ? 'Update customer record' : 'New customer record'}>
+          <form className="form-grid form-grid-single" onSubmit={submitCustomer} noValidate>
             <Field label="Company">
               <input
                 className="form-control"
@@ -422,9 +583,12 @@ export default function CustomerRouteTripManagement() {
               </select>
             </Field>
             {customerError ? <p className="auth-error">{customerError}</p> : null}
-            <button className="button button-primary" type="submit">
-              Add customer
-            </button>
+            <div className="inline-group">
+              <button className="button button-primary" type="submit" disabled={isCustomerSaving}>
+                {isCustomerSaving ? 'Saving...' : editingCustomerId ? 'Update customer' : 'Add customer'}
+              </button>
+              {editingCustomerId ? <button className="button button-secondary" type="button" onClick={resetCustomerForm} disabled={isCustomerSaving}>Cancel edit</button> : null}
+            </div>
           </form>
         </Card>
       </section>
@@ -449,11 +613,11 @@ export default function CustomerRouteTripManagement() {
               </select>
             </Field>
           </Toolbar>
-          <DataTable columns={routeColumns} rows={filteredRoutes} getRowKey={(route) => route.id} />
+          <DataTable columns={routeColumns} rows={filteredRoutes} getRowKey={getRecordId} />
         </Card>
 
-        <Card eyebrow="Add route" title="New route record">
-          <form className="form-grid form-grid-single" onSubmit={addRoute} noValidate>
+        <Card eyebrow={editingRouteId ? 'Edit route' : 'Add route'} title={editingRouteId ? 'Update route record' : 'New route record'}>
+          <form className="form-grid form-grid-single" onSubmit={submitRoute} noValidate>
             <Field label="Route name">
               <input
                 className="form-control"
@@ -525,9 +689,12 @@ export default function CustomerRouteTripManagement() {
               </select>
             </Field>
             {routeError ? <p className="auth-error">{routeError}</p> : null}
-            <button className="button button-primary" type="submit">
-              Add route
-            </button>
+            <div className="inline-group">
+              <button className="button button-primary" type="submit" disabled={isRouteSaving}>
+                {isRouteSaving ? 'Saving...' : editingRouteId ? 'Update route' : 'Add route'}
+              </button>
+              {editingRouteId ? <button className="button button-secondary" type="button" onClick={resetRouteForm} disabled={isRouteSaving}>Cancel edit</button> : null}
+            </div>
           </form>
         </Card>
       </section>
@@ -552,11 +719,11 @@ export default function CustomerRouteTripManagement() {
               </select>
             </Field>
           </Toolbar>
-          <DataTable columns={tripColumns} rows={filteredTrips} getRowKey={(trip) => trip.id} />
+          <DataTable columns={tripColumns} rows={filteredTrips} getRowKey={getRecordId} />
         </Card>
 
-        <Card eyebrow="Add trip" title="New trip record">
-          <form className="form-grid form-grid-single" onSubmit={addTrip} noValidate>
+        <Card eyebrow={editingTripId ? 'Edit trip' : 'Add trip'} title={editingTripId ? 'Update trip record' : 'New trip record'}>
+          <form className="form-grid form-grid-single" onSubmit={submitTrip} noValidate>
             <Field label="Customer">
               <input
                 className="form-control"
@@ -607,7 +774,6 @@ export default function CustomerRouteTripManagement() {
                 required
               />
             </Field>
-            {tripError ? <p className="auth-error">{tripError}</p> : null}
             <Field label="Status">
               <select
                 className="form-control"
@@ -620,9 +786,13 @@ export default function CustomerRouteTripManagement() {
                 ))}
               </select>
             </Field>
-            <button className="button button-primary" type="submit">
-              Add trip
-            </button>
+            {tripError ? <p className="auth-error">{tripError}</p> : null}
+            <div className="inline-group">
+              <button className="button button-primary" type="submit" disabled={isTripSaving}>
+                {isTripSaving ? 'Saving...' : editingTripId ? 'Update trip' : 'Add trip'}
+              </button>
+              {editingTripId ? <button className="button button-secondary" type="button" onClick={resetTripForm} disabled={isTripSaving}>Cancel edit</button> : null}
+            </div>
           </form>
         </Card>
       </section>
