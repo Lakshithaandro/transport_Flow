@@ -6,16 +6,7 @@ import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import useAuth from '../context/useAuth.js'
 import { analyticsApi } from '../services/analyticsApi.js'
-
-const currencyFormatter = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-})
-
-function currency(value) {
-  return currencyFormatter.format(Number(value) || 0)
-}
+import { formatCurrencyINR } from '../utils/currency.js'
 
 function percent(value) {
   return `${Number(value) || 0}%`
@@ -86,7 +77,7 @@ export default function ReportsAnalytics() {
     { key: 'routeName', label: 'Route' },
     { key: 'distanceMiles', label: 'Distance' },
     { key: 'estimatedHours', label: 'Hours' },
-    { key: 'estimatedFuelCost', label: 'Fuel Estimate', render: (row) => currency(row.estimatedFuelCost) },
+    { key: 'estimatedFuelCost', label: 'Fuel Estimate', render: (row) => formatCurrencyINR(row.estimatedFuelCost) },
   ]
 
   const fleetColumns = [
@@ -100,13 +91,13 @@ export default function ReportsAnalytics() {
     { key: 'driverName', label: 'Driver' },
     { key: 'assignedVehicle', label: 'Vehicle' },
     { key: 'trips', label: 'Trips' },
-    { key: 'fuelSpend', label: 'Fuel Spend', render: (row) => currency(row.fuelSpend) },
+    { key: 'fuelSpend', label: 'Fuel Spend', render: (row) => formatCurrencyINR(row.fuelSpend) },
     { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
   ]
 
   const fuelVehicleColumns = [
     { key: 'vehicleName', label: 'Vehicle' },
-    { key: 'fuelCost', label: 'Fuel Spend', render: (row) => currency(row.fuelCost) },
+    { key: 'fuelCost', label: 'Fuel Spend', render: (row) => formatCurrencyINR(row.fuelCost) },
   ]
 
   return (
@@ -120,9 +111,9 @@ export default function ReportsAnalytics() {
       <section className="report-section" aria-labelledby="revenue-reports">
         <SectionHeading eyebrow="Revenue Reports" title="Billing and collections" description="Track billed, collected, and pending amounts." />
         <section className="stat-grid" aria-label="Revenue reports" id="revenue-reports">
-          <StatCard label="Total Billing" value={currency(revenue.totalRevenue)} helper="All invoice value" tone="info" />
-          <StatCard label="Collected" value={currency(revenue.paidRevenue)} helper={`${revenue.paidCount || 0} paid invoices`} tone="success" />
-          <StatCard label="Pending Collection" value={currency(revenue.outstandingBalance)} helper="Amount yet to receive" tone="warning" />
+          <StatCard label="Total Billing" value={formatCurrencyINR(revenue.totalRevenue)} helper="All invoice value" tone="info" />
+          <StatCard label="Collected" value={formatCurrencyINR(revenue.paidRevenue)} helper={`${revenue.paidCount || 0} paid invoices`} tone="success" />
+          <StatCard label="Pending Collection" value={formatCurrencyINR(revenue.outstandingBalance)} helper="Amount yet to receive" tone="warning" />
           <StatCard label="Collection Rate" value={percent(revenue.collectionRate)} helper="Collected vs billed" tone="neutral" />
         </section>
       </section>
@@ -169,10 +160,10 @@ export default function ReportsAnalytics() {
       <section className="report-section" aria-labelledby="fuel-maintenance">
         <SectionHeading eyebrow="Fuel & Maintenance Summary" title="Spend and service" description="Track fuel spend and vehicle service cost in one place." />
         <section className="stat-grid" aria-label="Fuel and maintenance summary" id="fuel-maintenance">
-          <StatCard label="Fuel Spend" value={currency(fuel.totalFuelCost)} helper="Total fuel entries" tone="warning" />
+          <StatCard label="Fuel Spend" value={formatCurrencyINR(fuel.totalFuelCost)} helper="Total fuel entries" tone="warning" />
           <StatCard label="Fuel Quantity" value={`${Number(fuel.totalGallons || 0).toLocaleString('en-IN')} gal`} helper="Fuel logged" tone="info" />
-          <StatCard label="Average Fuel Rate" value={currency(fuel.averageCostPerGallon)} helper="Average per gallon" tone="neutral" />
-          <StatCard label="Service Cost" value={currency(fleet.totalMaintenanceCost)} helper="Maintenance spend" tone="info" />
+          <StatCard label="Average Fuel Rate" value={formatCurrencyINR(fuel.averageCostPerGallon)} helper="Average per gallon" tone="neutral" />
+          <StatCard label="Service Cost" value={formatCurrencyINR(fleet.totalMaintenanceCost)} helper="Maintenance spend" tone="info" />
         </section>
         <Card className="table-shell compact-table" eyebrow="Fuel Spend" title="Fuel spend by vehicle">
           <DataTable columns={fuelVehicleColumns} rows={fuel.costByVehicle || []} getRowKey={(row) => row.id} emptyTitle="No fuel spend yet" emptyMessage="Fuel logs will appear here after they are created." />

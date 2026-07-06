@@ -21,12 +21,7 @@ import { analyticsApi } from '../services/analyticsApi.js'
 import { customerRouteTripApi } from '../services/customerRouteTripApi.js'
 import { invoiceApi } from '../services/invoiceApi.js'
 import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
-
-const currencyFormatter = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-})
+import { formatCurrencyINR } from '../utils/currency.js'
 
 const activeTripStatuses = ['Scheduled', 'In Transit', 'Delayed']
 const tripStatusLabels = {
@@ -34,10 +29,6 @@ const tripStatusLabels = {
   'In Transit': 'On Road',
   Delayed: 'Delayed',
   Completed: 'Completed',
-}
-
-function currency(value) {
-  return currencyFormatter.format(Number(value) || 0)
 }
 
 function getRecordId(record) {
@@ -159,7 +150,7 @@ export default function Dashboard() {
   const activities = [
     maintenanceVehicles ? `${maintenanceVehicles} vehicles are in service or maintenance.` : '',
     deliveriesToday ? `${deliveriesToday} deliveries are planned for today.` : '',
-    Number(revenue.outstandingBalance) ? `${currency(revenue.outstandingBalance)} pending collection.` : '',
+    Number(revenue.outstandingBalance) ? `${formatCurrencyINR(revenue.outstandingBalance)} pending collection.` : '',
     driversNeedReview ? `${driversNeedReview} drivers need review before assignment.` : '',
   ].filter(Boolean)
 
@@ -198,9 +189,9 @@ export default function Dashboard() {
       </section>
 
       <section className="stat-grid" aria-label="Billing and service summary">
-        <StatCard label="Total Billing" value={currency(revenue.totalRevenue)} helper="All invoice value" tone="info" />
-        <StatCard label="Collected Amount" value={currency(revenue.paidRevenue)} helper="Received payments" tone="success" />
-        <StatCard label="Pending Amount" value={currency(revenue.outstandingBalance)} helper="To be collected" tone="warning" />
+        <StatCard label="Total Billing" value={formatCurrencyINR(revenue.totalRevenue)} helper="All invoice value" tone="info" />
+        <StatCard label="Collected Amount" value={formatCurrencyINR(revenue.paidRevenue)} helper="Received payments" tone="success" />
+        <StatCard label="Pending Amount" value={formatCurrencyINR(revenue.outstandingBalance)} helper="To be collected" tone="warning" />
         <StatCard label="Vehicles in Service" value={maintenanceVehicles} helper="Maintenance status" tone={maintenanceVehicles ? 'warning' : 'success'} />
       </section>
 
@@ -225,8 +216,8 @@ export default function Dashboard() {
               <LineChart data={revenueOverview} margin={{ top: 10, right: 16, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" />
-                <YAxis tickFormatter={(value) => `₹${Math.round(Number(value) / 1000)}k`} />
-                <Tooltip formatter={(value) => currency(value)} />
+                <YAxis tickFormatter={(value) => formatCurrencyINR(value)} />
+                <Tooltip formatter={(value) => formatCurrencyINR(value)} />
                 <Line type="monotone" dataKey="amount" stroke="var(--color-success)" strokeWidth={3} dot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>

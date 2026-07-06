@@ -1,0 +1,885 @@
+diff --git a/server/models/Driver.js b/server/models/Driver.js
+index c353281..6eaefe3 100644
+--- a/server/models/Driver.js
++++ b/server/models/Driver.js
+@@ -1,6 +1,5 @@
+ import mongoose from 'mongoose'
+ 
+-<<<<<<< HEAD
+ const driverDocumentSchema = new mongoose.Schema(
+   {
+     name: { type: String, required: true, trim: true },
+@@ -11,8 +10,6 @@ const driverDocumentSchema = new mongoose.Schema(
+   { _id: false },
+ )
+ 
+-=======
+->>>>>>> milestone7
+ const driverSchema = new mongoose.Schema(
+   {
+     name: { type: String, required: true, trim: true },
+@@ -20,13 +17,10 @@ const driverSchema = new mongoose.Schema(
+     phone: { type: String, required: true, trim: true },
+     status: { type: String, enum: ['Available', 'Assigned', 'Needs Review'], default: 'Available' },
+     assignedVehicle: { type: String, default: 'Unassigned', trim: true },
+-<<<<<<< HEAD
+     licenseExpiry: { type: String, default: '', trim: true },
+     emergencyContactName: { type: String, default: '', trim: true },
+     emergencyContactPhone: { type: String, default: '', trim: true },
+     documents: { type: [driverDocumentSchema], default: [] },
+-=======
+->>>>>>> milestone7
+     createdByUid: { type: String, required: true, index: true },
+     createdByEmail: { type: String, default: '' },
+   },
+@@ -35,9 +29,6 @@ const driverSchema = new mongoose.Schema(
+ 
+ driverSchema.index({ createdByUid: 1, phone: 1 }, { unique: true })
+ driverSchema.index({ createdByUid: 1, status: 1 })
+-<<<<<<< HEAD
+ driverSchema.index({ createdByUid: 1, licenseExpiry: 1 })
+-=======
+->>>>>>> milestone7
+ 
+ export default mongoose.model('Driver', driverSchema)
+diff --git a/server/schemas/driver.schema.js b/server/schemas/driver.schema.js
+index 8acedf1..c5beb8c 100644
+--- a/server/schemas/driver.schema.js
++++ b/server/schemas/driver.schema.js
+@@ -1,22 +1,16 @@
+ import { z } from 'zod'
+ 
+ const personNamePattern = /^[A-Za-z][A-Za-z .'-]*$/
+-<<<<<<< HEAD
+ const datePattern = /^\d{4}-\d{2}-\d{2}$/
+ const dateTimePattern = /^\d{4}-\d{2}-\d{2}T.*Z$/
+-=======
+->>>>>>> milestone7
+ 
+ export const driverLicenseClasses = ['Class A CDL', 'Class B CDL']
+ export const driverStatuses = ['Available', 'Assigned', 'Needs Review']
+ 
+-<<<<<<< HEAD
+ function emptyStringToUndefined(value) {
+   return typeof value === 'string' && value.trim() === '' ? undefined : value
+ }
+ 
+-=======
+->>>>>>> milestone7
+ function normalizePhone(value) {
+   const digits = value.replace(/\D/g, '')
+   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+@@ -28,7 +22,6 @@ function formatPhone(value) {
+   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+ }
+ 
+-<<<<<<< HEAD
+ const optionalDateStringSchema = z.preprocess(
+   emptyStringToUndefined,
+   z
+@@ -70,21 +63,16 @@ const driverDocumentSchema = z.object({
+   ),
+ })
+ 
+-=======
+->>>>>>> milestone7
+ const driverBaseSchema = z.object({
+   name: z.string().trim().min(2).max(80).regex(personNamePattern, 'Driver name can only include letters, spaces, apostrophes, hyphens, and periods'),
+   licenseClass: z.enum(driverLicenseClasses),
+   phone: z.string().trim().refine((value) => normalizePhone(value).length === 10, 'Phone must include a valid 10-digit phone number').transform(formatPhone),
+   status: z.enum(driverStatuses).default('Available'),
+   assignedVehicle: z.string().trim().optional().default('Unassigned'),
+-<<<<<<< HEAD
+   licenseExpiry: optionalDateStringSchema,
+   emergencyContactName: optionalPersonNameSchema,
+   emergencyContactPhone: optionalPhoneSchema,
+   documents: z.array(driverDocumentSchema).optional().default([]),
+-=======
+->>>>>>> milestone7
+ })
+ 
+ export const createDriverSchema = driverBaseSchema
+diff --git a/src/pages/FuelMaintenanceManagement.jsx b/src/pages/FuelMaintenanceManagement.jsx
+index 7c774c1..3629c11 100644
+--- a/src/pages/FuelMaintenanceManagement.jsx
++++ b/src/pages/FuelMaintenanceManagement.jsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useState } from 'react'
+ import { Pencil } from 'lucide-react'
++import Badge from '../components/ui/Badge.jsx'
+ import Card from '../components/ui/Card.jsx'
+ import DataTable from '../components/ui/DataTable.jsx'
+ import Field from '../components/ui/Field.jsx'
+@@ -18,6 +19,11 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
+   maximumFractionDigits: 2,
+ })
+ 
++const trackedServiceTypes = ['Oil Change', 'Tyre Replacement']
++const serviceIntervalKm = 5000
++const documentReminderDays = 30
++const serviceOdometerPattern = /(?:^|\n)Service odometer:\s*([\d,.]+)\s*KM\s*(?:\n|$)/i
++
+ const emptyFuelForm = {
+   vehicleId: '',
+   vehicleName: '',
+@@ -35,6 +41,7 @@ const emptyMaintenanceForm = {
+   vehicleId: '',
+   vehicleName: '',
+   serviceType: '',
++  currentOdometer: '',
+   nextServiceDate: '',
+   cost: '',
+   mechanicName: '',
+@@ -54,6 +61,208 @@ function getRecordId(record) {
+   return record._id || record.id
+ }
+ 
++function normalizeServiceType(value) {
++  return String(value || '').trim().toLowerCase()
++}
++
++function isTrackedServiceType(value) {
++  const normalizedValue = normalizeServiceType(value)
++  return trackedServiceTypes.some((type) => normalizeServiceType(type) === normalizedValue)
++}
++
++function parseServiceOdometerFromNotes(notes = '') {
++  const match = String(notes).match(serviceOdometerPattern)
++  if (!match) return null
++
++  const parsedOdometer = Number(match[1].replace(/,/g, ''))
++  return Number.isFinite(parsedOdometer) ? parsedOdometer : null
++}
++
++function stripServiceOdometerMarker(notes = '') {
++  return String(notes).replace(serviceOdometerPattern, '\n').replace(/\n{3,}/g, '\n\n').trim()
++}
++
++function withServiceOdometerNote(notes, odometer) {
++  const cleanedNotes = stripServiceOdometerMarker(notes)
++  const marker = `Service odometer: ${Number(odometer).toLocaleString()} KM`
++  return cleanedNotes ? `${cleanedNotes}\n${marker}` : marker
++}
++
++function getCurrentOdometerByVehicle(fuelLogs) {
++  return fuelLogs.reduce((odometerByVehicle, fuelLog) => {
++    const odometerReading = Number(fuelLog.odometerReading)
++    if (!fuelLog.vehicleId || !Number.isFinite(odometerReading)) return odometerByVehicle
++
++    const currentOdometer = odometerByVehicle[fuelLog.vehicleId]
++    if (currentOdometer === undefined || odometerReading > currentOdometer) {
++      odometerByVehicle[fuelLog.vehicleId] = odometerReading
++    }
++
++    return odometerByVehicle
++  }, {})
++}
++
++function getMaintenanceSortValue(record) {
++  const dateValue = record.updatedAt || record.createdAt || record.nextServiceDate || record.reminderDate
++  const parsedDate = new Date(dateValue).getTime()
++  return Number.isFinite(parsedDate) ? parsedDate : 0
++}
++
++function getLatestCompletedServiceRecord(records, vehicleId, serviceType) {
++  return records
++    .filter(
++      (record) =>
++        record.vehicleId === vehicleId &&
++        record.status === 'Completed' &&
++        normalizeServiceType(record.serviceType) === normalizeServiceType(serviceType) &&
++        parseServiceOdometerFromNotes(record.notes) !== null,
++    )
++    .sort((firstRecord, secondRecord) => getMaintenanceSortValue(secondRecord) - getMaintenanceSortValue(firstRecord))[0]
++}
++
++function parseDateOnly(value) {
++  if (!value) return null
++
++  const dateValue = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toDateInputValue(value)
++  const [year, month, day] = dateValue.split('-').map(Number)
++  if (!year || !month || !day) return null
++
++  const parsedDate = new Date(year, month - 1, day)
++  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate
++}
++
++function getTodayDateOnly() {
++  const today = new Date()
++  today.setHours(0, 0, 0, 0)
++  return today
++}
++
++function getDaysUntil(value) {
++  const date = parseDateOnly(value)
++  if (!date) return null
++
++  const millisecondsInDay = 1000 * 60 * 60 * 24
++  return Math.ceil((date.getTime() - getTodayDateOnly().getTime()) / millisecondsInDay)
++}
++
++function formatDate(value) {
++  const date = parseDateOnly(value)
++  if (!date) return 'Not set'
++
++  return date.toLocaleDateString(undefined, {
++    day: 'numeric',
++    month: 'short',
++    year: 'numeric',
++  })
++}
++
++function getDocumentReminderStatus(expiryDate) {
++  const daysUntil = getDaysUntil(expiryDate)
++  if (daysUntil === null) return null
++  if (daysUntil < 0) return { label: 'Expired', tone: 'danger', daysUntil }
++  if (daysUntil <= documentReminderDays) return { label: 'Upcoming', tone: 'warning', daysUntil }
++  return null
++}
++
++function getDocumentReminderDetail(daysUntil) {
++  if (daysUntil < 0) {
++    const daysExpired = Math.abs(daysUntil)
++    return daysExpired === 1 ? 'Expired 1 day ago' : `Expired ${daysExpired} days ago`
++  }
++
++  if (daysUntil === 0) return 'Expires today'
++  return daysUntil === 1 ? 'Expires in 1 day' : `Expires in ${daysUntil} days`
++}
++
++function getMaintenanceDateLabel(serviceType) {
++  if (normalizeServiceType(serviceType) === normalizeServiceType('Oil Change')) return 'Oil change date'
++  if (normalizeServiceType(serviceType) === normalizeServiceType('Tyre Replacement')) return 'Replacement date'
++  return 'Next service date'
++}
++
++function buildServiceReminderRows(vehicles, fuelLogs, maintenanceRecords) {
++  const currentOdometerByVehicle = getCurrentOdometerByVehicle(fuelLogs)
++
++  return vehicles.flatMap((vehicle) =>
++    trackedServiceTypes.map((serviceType) => {
++      const vehicleId = getRecordId(vehicle)
++      const currentOdometer = currentOdometerByVehicle[vehicleId]
++      const latestService = getLatestCompletedServiceRecord(maintenanceRecords, vehicleId, serviceType)
++      const serviceOdometer = latestService ? parseServiceOdometerFromNotes(latestService.notes) : null
++
++      if (currentOdometer === undefined) {
++        return {
++          id: `${vehicleId}-${serviceType}`,
++          vehicleId,
++          vehicleName: vehicle.unit,
++          serviceType,
++          currentOdometer: null,
++          lastServiceOdometer: serviceOdometer,
++          distanceSinceService: null,
++          status: 'Odometer Needed',
++          tone: 'warning',
++          detail: 'Add a fuel log with odometer reading.',
++        }
++      }
++
++      if (serviceOdometer === null) {
++        return {
++          id: `${vehicleId}-${serviceType}`,
++          vehicleId,
++          vehicleName: vehicle.unit,
++          serviceType,
++          currentOdometer,
++          lastServiceOdometer: null,
++          distanceSinceService: null,
++          status: 'Baseline Needed',
++          tone: 'neutral',
++          detail: 'Record a completed service to start tracking.',
++        }
++      }
++
++      const distanceSinceService = Math.max(0, currentOdometer - serviceOdometer)
++      const isDue = distanceSinceService >= serviceIntervalKm
++
++      return {
++        id: `${vehicleId}-${serviceType}`,
++        vehicleId,
++        vehicleName: vehicle.unit,
++        serviceType,
++        currentOdometer,
++        lastServiceOdometer: serviceOdometer,
++        distanceSinceService,
++        status: isDue ? 'Service Due' : 'OK',
++        tone: isDue ? 'danger' : 'success',
++        detail: isDue ? `${distanceSinceService.toLocaleString()} KM since last service.` : `${(serviceIntervalKm - distanceSinceService).toLocaleString()} KM remaining.`,
++      }
++    }),
++  )
++}
++
++function buildComplianceReminderRows(vehicles) {
++  return vehicles.flatMap((vehicle) =>
++    [
++      { type: 'Insurance', expiryDate: vehicle.insuranceExpiry },
++      { type: 'Permit', expiryDate: vehicle.permitExpiry },
++    ]
++      .map((document) => {
++        const reminderStatus = getDocumentReminderStatus(document.expiryDate)
++        if (!reminderStatus) return null
++
++        return {
++          id: `${getRecordId(vehicle)}-${document.type}`,
++          vehicleName: vehicle.unit,
++          documentType: document.type,
++          expiryDate: document.expiryDate,
++          status: reminderStatus.label,
++          tone: reminderStatus.tone,
++          detail: getDocumentReminderDetail(reminderStatus.daysUntil),
++        }
++      })
++      .filter(Boolean),
++  )
++}
++
+ export default function FuelMaintenanceManagement() {
+   const { getAuthToken } = useAuth()
+   const [fuelLogs, setFuelLogs] = useState([])
+@@ -73,12 +282,18 @@ export default function FuelMaintenanceManagement() {
+   const [fuelQuery, setFuelQuery] = useState('')
+   const [maintenanceQuery, setMaintenanceQuery] = useState('')
+   const [maintenanceStatusFilter, setMaintenanceStatusFilter] = useState('All')
++  const [maintenanceVehicleFilter, setMaintenanceVehicleFilter] = useState('All')
++  const [maintenanceServiceTypeFilter, setMaintenanceServiceTypeFilter] = useState('All')
+   const [isLoading, setIsLoading] = useState(true)
+   const [isFuelSaving, setIsFuelSaving] = useState(false)
+   const [isMaintenanceSaving, setIsMaintenanceSaving] = useState(false)
+   const [error, setError] = useState('')
+   const [saveMessage, setSaveMessage] = useState('')
+   const today = todayDateInputValue()
++  const currentOdometerByVehicle = getCurrentOdometerByVehicle(fuelLogs)
++  const selectedMaintenanceIsTracked = isTrackedServiceType(maintenanceForm.serviceType)
++  const serviceReminderRows = buildServiceReminderRows(vehicles, fuelLogs, maintenanceRecords)
++  const complianceReminderRows = buildComplianceReminderRows(vehicles)
+ 
+   const loadFuelMaintenanceData = async () => {
+     setIsLoading(true)
+@@ -110,9 +325,16 @@ export default function FuelMaintenanceManagement() {
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [])
+ 
+-  const handleVehicleSelection = (vehicleId, setter, currentForm) => {
++  const handleVehicleSelection = (vehicleId, setter, currentForm, options = {}) => {
+     const vehicle = vehicles.find((item) => getRecordId(item) === vehicleId)
+-    setter({ ...currentForm, vehicleId, vehicleName: vehicle?.unit || '' })
++    const nextForm = { ...currentForm, vehicleId, vehicleName: vehicle?.unit || '' }
++
++    if (options.includeOdometer) {
++      const currentOdometer = currentOdometerByVehicle[vehicleId]
++      nextForm.currentOdometer = currentForm.currentOdometer || (currentOdometer !== undefined ? String(currentOdometer) : '')
++    }
++
++    setter(nextForm)
+   }
+ 
+   const handleDriverSelection = (driverId) => {
+@@ -120,6 +342,15 @@ export default function FuelMaintenanceManagement() {
+     setFuelForm({ ...fuelForm, driverId, driverName: driver?.name || '' })
+   }
+ 
++  const handleMaintenanceServiceTypeChange = (serviceType) => {
++    const currentOdometer = currentOdometerByVehicle[maintenanceForm.vehicleId]
++    setMaintenanceForm({
++      ...maintenanceForm,
++      serviceType,
++      currentOdometer: maintenanceForm.currentOdometer || (isTrackedServiceType(serviceType) && currentOdometer !== undefined ? String(currentOdometer) : ''),
++    })
++  }
++
+   const submitFuelLog = async (event) => {
+     event.preventDefault()
+     setError('')
+@@ -165,7 +396,7 @@ export default function FuelMaintenanceManagement() {
+     setSaveMessage('')
+ 
+     if (isBeforeToday(maintenanceForm.nextServiceDate)) {
+-      setError('Next service date cannot be in the past.')
++      setError(`${getMaintenanceDateLabel(maintenanceForm.serviceType)} cannot be in the past.`)
+       return
+     }
+ 
+@@ -175,13 +406,23 @@ export default function FuelMaintenanceManagement() {
+     }
+ 
+     if (isAfterDate(maintenanceForm.reminderDate, maintenanceForm.nextServiceDate)) {
+-      setError('Reminder date cannot be after the next service date.')
++      setError('Reminder date cannot be after the service date.')
++      return
++    }
++
++    const isCompletedTrackedService = selectedMaintenanceIsTracked && maintenanceForm.status === 'Completed'
++    const serviceOdometer = Number(maintenanceForm.currentOdometer)
++
++    if (isCompletedTrackedService && (!Number.isFinite(serviceOdometer) || serviceOdometer < 0)) {
++      setError('Current odometer (KM) is required for completed oil change and tyre replacement records.')
+       return
+     }
+ 
++    const { currentOdometer, ...maintenancePayload } = maintenanceForm
+     const payload = {
+-      ...maintenanceForm,
++      ...maintenancePayload,
+       cost: Number(maintenanceForm.cost),
++      notes: isCompletedTrackedService ? withServiceOdometerNote(maintenanceForm.notes, serviceOdometer) : stripServiceOdometerMarker(maintenanceForm.notes),
+     }
+ 
+     setIsMaintenanceSaving(true)
+@@ -230,12 +471,13 @@ export default function FuelMaintenanceManagement() {
+       vehicleId: record.vehicleId,
+       vehicleName: record.vehicleName,
+       serviceType: record.serviceType,
++      currentOdometer: parseServiceOdometerFromNotes(record.notes) || '',
+       nextServiceDate: toDateInputValue(record.nextServiceDate),
+       cost: record.cost,
+       mechanicName: record.mechanicName,
+       status: record.status,
+       reminderDate: toDateInputValue(record.reminderDate),
+-      notes: record.notes || '',
++      notes: stripServiceOdometerMarker(record.notes || ''),
+     })
+   }
+ 
+@@ -271,13 +513,15 @@ export default function FuelMaintenanceManagement() {
+   })
+ 
+   const filteredMaintenanceRecords = maintenanceRecords.filter((record) => {
+-    const searchableText = [record.vehicleName, record.serviceType, record.mechanicName, record.status, record.notes]
++    const searchableText = [record.vehicleName, record.serviceType, record.mechanicName, record.status, stripServiceOdometerMarker(record.notes)]
+       .join(' ')
+       .toLowerCase()
+     const matchesQuery = searchableText.includes(maintenanceQuery.toLowerCase())
+     const matchesStatus = maintenanceStatusFilter === 'All' || record.status === maintenanceStatusFilter
++    const matchesVehicle = maintenanceVehicleFilter === 'All' || record.vehicleId === maintenanceVehicleFilter
++    const matchesServiceType = maintenanceServiceTypeFilter === 'All' || normalizeServiceType(record.serviceType) === normalizeServiceType(maintenanceServiceTypeFilter)
+ 
+-    return matchesQuery && matchesStatus
++    return matchesQuery && matchesStatus && matchesVehicle && matchesServiceType
+   })
+ 
+   const fuelColumns = [
+@@ -305,10 +549,34 @@ export default function FuelMaintenanceManagement() {
+     },
+   ]
+ 
++  const serviceReminderColumns = [
++    { key: 'vehicleName', label: 'Vehicle', render: (row) => <strong className="cell-primary">{row.vehicleName}</strong> },
++    { key: 'serviceType', label: 'Service' },
++    { key: 'currentOdometer', label: 'Current odometer', render: (row) => (row.currentOdometer === null ? 'Not set' : `${Number(row.currentOdometer).toLocaleString()} KM`) },
++    { key: 'distanceSinceService', label: 'Since service', render: (row) => (row.distanceSinceService === null ? row.detail : `${Number(row.distanceSinceService).toLocaleString()} KM`) },
++    { key: 'status', label: 'Reminder', render: (row) => <Badge tone={row.tone}>{row.status}</Badge> },
++  ]
++
++  const complianceReminderColumns = [
++    { key: 'vehicleName', label: 'Vehicle', render: (row) => <strong className="cell-primary">{row.vehicleName}</strong> },
++    { key: 'documentType', label: 'Document' },
++    { key: 'expiryDate', label: 'Expiry date', render: (row) => formatDate(row.expiryDate) },
++    { key: 'detail', label: 'Reminder' },
++    { key: 'status', label: 'Status', render: (row) => <Badge tone={row.tone}>{row.status}</Badge> },
++  ]
++
+   const maintenanceColumns = [
+     { key: 'vehicleName', label: 'Vehicle', render: (record) => <strong className="cell-primary">{record.vehicleName}</strong> },
+     { key: 'serviceType', label: 'Service' },
+-    { key: 'nextServiceDate', label: 'Next service', render: (record) => toDateInputValue(record.nextServiceDate) },
++    { key: 'nextServiceDate', label: 'Service date', render: (record) => toDateInputValue(record.nextServiceDate) },
++    {
++      key: 'currentOdometer',
++      label: 'Odometer',
++      render: (record) => {
++        const serviceOdometer = parseServiceOdometerFromNotes(record.notes)
++        return serviceOdometer === null ? <span className="cell-muted">Not recorded</span> : `${Number(serviceOdometer).toLocaleString()} KM`
++      },
++    },
+     { key: 'cost', label: 'Cost', render: (record) => currencyFormatter.format(record.cost) },
+     { key: 'mechanicName', label: 'Mechanic' },
+     { key: 'status', label: 'Status', render: (record) => <StatusBadge status={record.status} /> },
+@@ -349,6 +617,28 @@ export default function FuelMaintenanceManagement() {
+         <StatCard label="Maintenance Cost" value={currencyFormatter.format(summary.totalMaintenanceCost)} helper="Total service cost" tone="neutral" />
+       </section>
+ 
++      <section className="content-grid">
++        <Card className="table-shell" eyebrow="Service reminders" title="5,000 KM interval monitor">
++          <DataTable
++            columns={serviceReminderColumns}
++            rows={serviceReminderRows}
++            getRowKey={(row) => row.id}
++            emptyTitle="No service reminders"
++            emptyMessage="Add vehicles and fuel logs to start service interval tracking."
++          />
++        </Card>
++
++        <Card className="table-shell" eyebrow="Compliance reminders" title="Insurance and permit renewals">
++          <DataTable
++            columns={complianceReminderColumns}
++            rows={complianceReminderRows}
++            getRowKey={(row) => row.id}
++            emptyTitle="No compliance reminders"
++            emptyMessage="No insurance or permit renewals are due within the next 30 days."
++          />
++        </Card>
++      </section>
++
+       <section className="content-grid">
+         <Card eyebrow={editingFuelId ? 'Edit fuel log' : 'Fuel entry'} title={editingFuelId ? 'Update fuel log' : 'Add fuel log'}>
+           <form className="form-grid form-grid-single" onSubmit={submitFuelLog}>
+@@ -403,7 +693,7 @@ export default function FuelMaintenanceManagement() {
+               <select
+                 className="form-control"
+                 value={maintenanceForm.vehicleId}
+-                onChange={(event) => handleVehicleSelection(event.target.value, setMaintenanceForm, maintenanceForm)}
++                onChange={(event) => handleVehicleSelection(event.target.value, setMaintenanceForm, maintenanceForm, { includeOdometer: true })}
+               >
+                 <option value="">Select vehicle</option>
+                 {vehicles.map((vehicle) => (
+@@ -412,9 +702,17 @@ export default function FuelMaintenanceManagement() {
+               </select>
+             </Field>
+             <Field label="Service type">
+-              <input className="form-control" value={maintenanceForm.serviceType} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, serviceType: event.target.value })} />
++              <input className="form-control" list="maintenance-service-types" value={maintenanceForm.serviceType} onChange={(event) => handleMaintenanceServiceTypeChange(event.target.value)} />
++              <datalist id="maintenance-service-types">
++                {trackedServiceTypes.map((serviceType) => <option key={serviceType} value={serviceType} />)}
++              </datalist>
+             </Field>
+-            <Field label="Next service date">
++            {selectedMaintenanceIsTracked ? (
++              <Field label="Current Odometer (KM)">
++                <input className="form-control" type="number" min="0" value={maintenanceForm.currentOdometer} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, currentOdometer: event.target.value })} />
++              </Field>
++            ) : null}
++            <Field label={getMaintenanceDateLabel(maintenanceForm.serviceType)}>
+               <input className="form-control" type="date" min={today} value={maintenanceForm.nextServiceDate} onChange={(event) => setMaintenanceForm({ ...maintenanceForm, nextServiceDate: event.target.value })} />
+             </Field>
+             <Field label="Cost">
+@@ -469,6 +767,18 @@ export default function FuelMaintenanceManagement() {
+                 placeholder="Search vehicle, service, mechanic..."
+               />
+             </Field>
++            <Field label="Vehicle">
++              <select className="form-control" value={maintenanceVehicleFilter} onChange={(event) => setMaintenanceVehicleFilter(event.target.value)}>
++                <option>All</option>
++                {vehicles.map((vehicle) => <option key={getRecordId(vehicle)} value={getRecordId(vehicle)}>{vehicle.unit}</option>)}
++              </select>
++            </Field>
++            <Field label="Service">
++              <select className="form-control" value={maintenanceServiceTypeFilter} onChange={(event) => setMaintenanceServiceTypeFilter(event.target.value)}>
++                <option>All</option>
++                {trackedServiceTypes.map((serviceType) => <option key={serviceType}>{serviceType}</option>)}
++              </select>
++            </Field>
+             <Field label="Status">
+               <select className="form-control" value={maintenanceStatusFilter} onChange={(event) => setMaintenanceStatusFilter(event.target.value)}>
+                 <option>All</option>
+diff --git a/src/pages/VehicleDriverManagement.jsx b/src/pages/VehicleDriverManagement.jsx
+index 670e573..57a859c 100644
+--- a/src/pages/VehicleDriverManagement.jsx
++++ b/src/pages/VehicleDriverManagement.jsx
+@@ -11,8 +11,6 @@ import StatusBadge from '../components/ui/StatusBadge.jsx'
+ import Toolbar from '../components/ui/Toolbar.jsx'
+ import useAuth from '../context/useAuth.js'
+ import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
+-import useAuth from '../context/useAuth.js'
+-import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
+ import {
+   formatPhone,
+   normalizePhone,
+@@ -284,9 +282,6 @@ function renderDocuments(documents = []) {
+ }
+ 
+ export default function VehicleDriverManagement() {
+-  const { getAuthToken } = useAuth()
+-  const [vehicles, setVehicles] = useState([])
+-  const [drivers, setDrivers] = useState([])
+   const { getAuthToken } = useAuth()
+   const [vehicles, setVehicles] = useState([])
+   const [drivers, setDrivers] = useState([])
+@@ -298,8 +293,6 @@ export default function VehicleDriverManagement() {
+   const [driverError, setDriverError] = useState('')
+   const [loadError, setLoadError] = useState('')
+   const [saveMessage, setSaveMessage] = useState('')
+-  const [loadError, setLoadError] = useState('')
+-  const [saveMessage, setSaveMessage] = useState('')
+   const [deleteTarget, setDeleteTarget] = useState(null)
+   const [vehicleForm, setVehicleForm] = useState(emptyVehicleForm)
+   const [driverForm, setDriverForm] = useState(emptyDriverForm)
+@@ -327,37 +320,6 @@ export default function VehicleDriverManagement() {
+     }
+   }
+ 
+-  useEffect(() => {
+-    // eslint-disable-next-line react-hooks/set-state-in-effect
+-    loadFleetRecords()
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [])
+-  const [vehicleForm, setVehicleForm] = useState(emptyVehicleForm)
+-  const [driverForm, setDriverForm] = useState(emptyDriverForm)
+-  const [editingVehicleId, setEditingVehicleId] = useState(null)
+-  const [editingDriverId, setEditingDriverId] = useState(null)
+-  const [isLoading, setIsLoading] = useState(true)
+-  const [isVehicleSaving, setIsVehicleSaving] = useState(false)
+-  const [isDriverSaving, setIsDriverSaving] = useState(false)
+-
+-  const loadFleetRecords = async () => {
+-    setIsLoading(true)
+-    setLoadError('')
+-
+-    try {
+-      const [vehicleData, driverData] = await Promise.all([
+-        vehicleDriverApi.getVehicles(getAuthToken),
+-        vehicleDriverApi.getDrivers(getAuthToken),
+-      ])
+-      setVehicles(vehicleData)
+-      setDrivers(driverData)
+-    } catch (requestError) {
+-      setLoadError(requestError.message)
+-    } finally {
+-      setIsLoading(false)
+-    }
+-  }
+-
+   useEffect(() => {
+     // eslint-disable-next-line react-hooks/set-state-in-effect
+     loadFleetRecords()
+@@ -415,24 +377,10 @@ export default function VehicleDriverManagement() {
+     setDriverError('')
+   }
+ 
+-  const submitVehicle = async (event) => {
+-  const resetVehicleForm = () => {
+-    setEditingVehicleId(null)
+-    setVehicleForm(emptyVehicleForm)
+-    setVehicleError('')
+-  }
+-
+-  const resetDriverForm = () => {
+-    setEditingDriverId(null)
+-    setDriverForm(emptyDriverForm)
+-    setDriverError('')
+-  }
+-
+   const submitVehicle = async (event) => {
+     event.preventDefault()
+     setVehicleError('')
+     setSaveMessage('')
+-    setSaveMessage('')
+ 
+     const sanitizedForm = trimFormValues(vehicleForm)
+     const normalizedPlate = normalizePlate(sanitizedForm.plate)
+@@ -459,9 +407,6 @@ export default function VehicleDriverManagement() {
+       return
+     }
+ 
+-    const plateExists = vehicles.some(
+-      (vehicle) => getRecordId(vehicle) !== editingVehicleId && normalizePlate(vehicle.plate) === normalizedPlate,
+-    )
+     const plateExists = vehicles.some(
+       (vehicle) => getRecordId(vehicle) !== editingVehicleId && normalizePlate(vehicle.plate) === normalizedPlate,
+     )
+@@ -473,27 +418,6 @@ export default function VehicleDriverManagement() {
+     const payload = { ...sanitizedForm, plate: normalizedPlate }
+     setIsVehicleSaving(true)
+ 
+-    try {
+-      if (editingVehicleId) {
+-        const updatedVehicle = await vehicleDriverApi.updateVehicle(editingVehicleId, payload, getAuthToken)
+-        setVehicles((currentVehicles) =>
+-          currentVehicles.map((vehicle) => (getRecordId(vehicle) === editingVehicleId ? updatedVehicle : vehicle)),
+-        )
+-        setSaveMessage('Vehicle updated successfully.')
+-      } else {
+-        const createdVehicle = await vehicleDriverApi.createVehicle({ ...payload, assignedDriver: 'Unassigned', mileage: 0 }, getAuthToken)
+-        setVehicles((currentVehicles) => [...currentVehicles, createdVehicle])
+-        setSaveMessage('Vehicle created successfully.')
+-      }
+-      resetVehicleForm()
+-    } catch (requestError) {
+-      setVehicleError(requestError.message)
+-    } finally {
+-      setIsVehicleSaving(false)
+-    }
+-    const payload = { ...sanitizedForm, plate: normalizedPlate }
+-    setIsVehicleSaving(true)
+-
+     try {
+       if (editingVehicleId) {
+         const updatedVehicle = await vehicleDriverApi.updateVehicle(editingVehicleId, payload, getAuthToken)
+@@ -514,12 +438,10 @@ export default function VehicleDriverManagement() {
+     }
+   }
+ 
+-  const submitDriver = async (event) => {
+   const submitDriver = async (event) => {
+     event.preventDefault()
+     setDriverError('')
+     setSaveMessage('')
+-    setSaveMessage('')
+ 
+     const sanitizedForm = trimFormValues(driverForm)
+     const nameError = validatePersonName(sanitizedForm.name, 'Driver name')
+@@ -548,9 +470,6 @@ export default function VehicleDriverManagement() {
+       return
+     }
+ 
+-    const phoneExists = drivers.some(
+-      (driver) => getRecordId(driver) !== editingDriverId && normalizePhone(driver.phone) === normalizePhone(sanitizedForm.phone),
+-    )
+     const phoneExists = drivers.some(
+       (driver) => getRecordId(driver) !== editingDriverId && normalizePhone(driver.phone) === normalizePhone(sanitizedForm.phone),
+     )
+@@ -659,28 +578,16 @@ export default function VehicleDriverManagement() {
+     setDeleteTarget({
+       type,
+       id: getRecordId(record),
+-      id: getRecordId(record),
+       label: type === 'vehicle' ? record.unit : record.name,
+     })
+   }
+ 
+-  const confirmDelete = async () => {
+   const confirmDelete = async () => {
+     if (!deleteTarget) return
+ 
+     setLoadError('')
+     setSaveMessage('')
+ 
+-    try {
+-      if (deleteTarget.type === 'vehicle') {
+-        await vehicleDriverApi.deleteVehicle(deleteTarget.id, getAuthToken)
+-        setVehicles((currentVehicles) => currentVehicles.filter((vehicle) => getRecordId(vehicle) !== deleteTarget.id))
+-        if (editingVehicleId === deleteTarget.id) resetVehicleForm()
+-        setSaveMessage('Vehicle deleted successfully.')
+-      }
+-    setLoadError('')
+-    setSaveMessage('')
+-
+     try {
+       if (deleteTarget.type === 'vehicle') {
+         await vehicleDriverApi.deleteVehicle(deleteTarget.id, getAuthToken)
+@@ -689,12 +596,6 @@ export default function VehicleDriverManagement() {
+         setSaveMessage('Vehicle deleted successfully.')
+       }
+ 
+-      if (deleteTarget.type === 'driver') {
+-        await vehicleDriverApi.deleteDriver(deleteTarget.id, getAuthToken)
+-        setDrivers((currentDrivers) => currentDrivers.filter((driver) => getRecordId(driver) !== deleteTarget.id))
+-        if (editingDriverId === deleteTarget.id) resetDriverForm()
+-        setSaveMessage('Driver deleted successfully.')
+-      }
+       if (deleteTarget.type === 'driver') {
+         await vehicleDriverApi.deleteDriver(deleteTarget.id, getAuthToken)
+         setDrivers((currentDrivers) => currentDrivers.filter((driver) => getRecordId(driver) !== deleteTarget.id))
+@@ -706,10 +607,6 @@ export default function VehicleDriverManagement() {
+     } catch (requestError) {
+       setLoadError(requestError.message)
+     }
+-      setDeleteTarget(null)
+-    } catch (requestError) {
+-      setLoadError(requestError.message)
+-    }
+   }
+ 
+   const vehicleColumns = [
+@@ -744,15 +641,15 @@ export default function VehicleDriverManagement() {
+       label: 'Actions',
+       className: 'cell-actions',
+       render: (vehicle) => (
+-        <div className="inline-group">
+-          <button className="button button-secondary button-small" type="button" onClick={() => editVehicle(vehicle)}>
+-            <Pencil className="lucide-icon" aria-hidden="true" />
+-            Edit
+-          </button>
+-          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('vehicle', vehicle)}>
+-            Remove
+-          </button>
+-        </div>
++        // <div className="inline-group">
++        //   <button className="button button-secondary button-small" type="button" onClick={() => editVehicle(vehicle)}>
++        //     <Pencil className="lucide-icon" aria-hidden="true" />
++        //     Edit
++        //   </button>
++        //   <button className="button button-danger button-small" type="button" onClick={() => requestDelete('vehicle', vehicle)}>
++        //     Remove
++        //   </button>
++       // </div>
+         <div className="inline-group">
+           <button className="button button-secondary button-small" type="button" onClick={() => editVehicle(vehicle)}>
+             <Pencil className="lucide-icon" aria-hidden="true" />
+@@ -805,15 +702,15 @@ export default function VehicleDriverManagement() {
+       label: 'Actions',
+       className: 'cell-actions',
+       render: (driver) => (
+-        <div className="inline-group">
+-          <button className="button button-secondary button-small" type="button" onClick={() => editDriver(driver)}>
+-            <Pencil className="lucide-icon" aria-hidden="true" />
+-            Edit
+-          </button>
+-          <button className="button button-danger button-small" type="button" onClick={() => requestDelete('driver', driver)}>
+-            Remove
+-          </button>
+-        </div>
++        // <div className="inline-group">
++        //   <button className="button button-secondary button-small" type="button" onClick={() => editDriver(driver)}>
++        //     <Pencil className="lucide-icon" aria-hidden="true" />
++        //     Edit
++        //   </button>
++        //   <button className="button button-danger button-small" type="button" onClick={() => requestDelete('driver', driver)}>
++        //     Remove
++        //   </button>
++        // </div>
+         <div className="inline-group">
+           <button className="button button-secondary button-small" type="button" onClick={() => editDriver(driver)}>
+             <Pencil className="lucide-icon" aria-hidden="true" />
+@@ -900,11 +797,8 @@ export default function VehicleDriverManagement() {
+             </Field>
+           </Toolbar>
+           <DataTable columns={vehicleColumns} rows={filteredVehicles} getRowKey={getRecordId} />
+-          <DataTable columns={vehicleColumns} rows={filteredVehicles} getRowKey={getRecordId} />
+         </Card>
+ 
+-        <Card eyebrow={editingVehicleId ? 'Edit vehicle' : 'Add vehicle'} title={editingVehicleId ? 'Update vehicle record' : 'New vehicle record'}>
+-          <form className="form-grid form-grid-single" onSubmit={submitVehicle} noValidate>
+         <Card eyebrow={editingVehicleId ? 'Edit vehicle' : 'Add vehicle'} title={editingVehicleId ? 'Update vehicle record' : 'New vehicle record'}>
+           <form className="form-grid form-grid-single" onSubmit={submitVehicle} noValidate>
+             <Field label="Unit name">
+@@ -1008,12 +902,6 @@ export default function VehicleDriverManagement() {
+               </button>
+               {editingVehicleId ? <button className="button button-secondary" type="button" onClick={resetVehicleForm} disabled={isVehicleSaving}>Cancel edit</button> : null}
+             </div>
+-            <div className="inline-group">
+-              <button className="button button-primary" type="submit" disabled={isVehicleSaving}>
+-                {isVehicleSaving ? 'Saving...' : editingVehicleId ? 'Update vehicle' : 'Add vehicle'}
+-              </button>
+-              {editingVehicleId ? <button className="button button-secondary" type="button" onClick={resetVehicleForm} disabled={isVehicleSaving}>Cancel edit</button> : null}
+-            </div>
+           </form>
+         </Card>
+       </section>
+@@ -1039,11 +927,8 @@ export default function VehicleDriverManagement() {
+             </Field>
+           </Toolbar>
+           <DataTable columns={driverColumns} rows={filteredDrivers} getRowKey={getRecordId} />
+-          <DataTable columns={driverColumns} rows={filteredDrivers} getRowKey={getRecordId} />
+         </Card>
+ 
+-        <Card eyebrow={editingDriverId ? 'Edit driver' : 'Add driver'} title={editingDriverId ? 'Update driver record' : 'New driver record'}>
+-          <form className="form-grid form-grid-single" onSubmit={submitDriver} noValidate>
+         <Card eyebrow={editingDriverId ? 'Edit driver' : 'Add driver'} title={editingDriverId ? 'Update driver record' : 'New driver record'}>
+           <form className="form-grid form-grid-single" onSubmit={submitDriver} noValidate>
+             <Field label="Driver name">
+@@ -1147,12 +1032,6 @@ export default function VehicleDriverManagement() {
+               </button>
+               {editingDriverId ? <button className="button button-secondary" type="button" onClick={resetDriverForm} disabled={isDriverSaving}>Cancel edit</button> : null}
+             </div>
+-            <div className="inline-group">
+-              <button className="button button-primary" type="submit" disabled={isDriverSaving}>
+-                {isDriverSaving ? 'Saving...' : editingDriverId ? 'Update driver' : 'Add driver'}
+-              </button>
+-              {editingDriverId ? <button className="button button-secondary" type="button" onClick={resetDriverForm} disabled={isDriverSaving}>Cancel edit</button> : null}
+-            </div>
+           </form>
+         </Card>
+       </section>

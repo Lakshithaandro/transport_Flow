@@ -11,14 +11,9 @@ import useAuth from '../context/useAuth.js'
 import { customerRouteTripApi } from '../services/customerRouteTripApi.js'
 import { invoiceApi } from '../services/invoiceApi.js'
 import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
+import { formatCurrencyINR } from '../utils/currency.js'
 import { isAfterDate, isBeforeToday, todayDateInputValue } from '../utils/date.js'
 import { exportInvoicePdf } from '../utils/invoicePdf.js'
-
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-})
 
 const emptyInvoiceForm = {
   customerId: '',
@@ -307,8 +302,8 @@ export default function InvoicePaymentManagement() {
     { key: 'customerName', label: 'Customer' },
     { key: 'tripName', label: 'Trip' },
     { key: 'vehicleName', label: 'Vehicle' },
-    { key: 'totalAmount', label: 'Total', render: (invoice) => currencyFormatter.format(invoice.totalAmount) },
-    { key: 'balanceDue', label: 'Balance', render: (invoice) => currencyFormatter.format(invoice.balanceDue) },
+    { key: 'totalAmount', label: 'Total', render: (invoice) => formatCurrencyINR(invoice.totalAmount) },
+    { key: 'balanceDue', label: 'Balance', render: (invoice) => formatCurrencyINR(invoice.balanceDue) },
     { key: 'paymentStatus', label: 'Status', render: (invoice) => <StatusBadge status={invoice.paymentStatus} /> },
     {
       key: 'actions',
@@ -339,9 +334,9 @@ export default function InvoicePaymentManagement() {
       {isLoading ? <Card title="Loading invoices"><p>Fetching invoices and revenue dashboard from the backend API.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Revenue dashboard">
-        <StatCard label="Total Revenue" value={currencyFormatter.format(summary.totalRevenue)} helper="All invoice totals" tone="info" />
-        <StatCard label="Paid Revenue" value={currencyFormatter.format(summary.paidRevenue)} helper={`${summary.paidCount || 0} paid invoices`} tone="success" />
-        <StatCard label="Outstanding" value={currencyFormatter.format(summary.outstandingBalance)} helper="Pending and partial balances" tone="warning" />
+        <StatCard label="Total Revenue" value={formatCurrencyINR(summary.totalRevenue)} helper="All invoice totals" tone="info" />
+        <StatCard label="Paid Revenue" value={formatCurrencyINR(summary.paidRevenue)} helper={`${summary.paidCount || 0} paid invoices`} tone="success" />
+        <StatCard label="Outstanding" value={formatCurrencyINR(summary.outstandingBalance)} helper="Pending and partial balances" tone="warning" />
         <StatCard label="Invoices" value={summary.invoiceCount || 0} helper={`${summary.pendingCount || 0} pending · ${summary.partialCount || 0} partial`} tone="neutral" />
       </section>
 
@@ -368,17 +363,17 @@ export default function InvoicePaymentManagement() {
             <span>Invoice Number</span>
             <strong>{nextInvoiceNumber || 'Generated on create'}</strong>
             <span>Subtotal</span>
-            <strong>{currencyFormatter.format(preview.subtotal)}</strong>
+            <strong>{formatCurrencyINR(preview.subtotal)}</strong>
             <span>Tax</span>
-            <strong>{currencyFormatter.format(preview.taxAmount)}</strong>
+            <strong>{formatCurrencyINR(preview.taxAmount)}</strong>
             <span>GST</span>
-            <strong>{currencyFormatter.format(preview.gstAmount)}</strong>
+            <strong>{formatCurrencyINR(preview.gstAmount)}</strong>
             <span>Discount</span>
-            <strong>{currencyFormatter.format(preview.discountAmount)}</strong>
+            <strong>{formatCurrencyINR(preview.discountAmount)}</strong>
             <span>Total</span>
-            <strong>{currencyFormatter.format(preview.totalAmount)}</strong>
+            <strong>{formatCurrencyINR(preview.totalAmount)}</strong>
             <span>Balance</span>
-            <strong>{currencyFormatter.format(preview.balanceDue)}</strong>
+            <strong>{formatCurrencyINR(preview.balanceDue)}</strong>
             <span>Status</span>
             <StatusBadge status={preview.paymentStatus} />
           </div>
@@ -431,7 +426,7 @@ export default function InvoicePaymentManagement() {
                     <input className="form-control" type="number" step="0.01" value={item.unitPrice} onChange={(event) => updateLineItem(index, 'unitPrice', event.target.value)} required />
                   </Field>
                   <Field label="Amount">
-                    <input className="form-control" value={currencyFormatter.format((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))} readOnly />
+                    <input className="form-control" value={formatCurrencyINR((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))} readOnly />
                   </Field>
                   {invoiceForm.lineItems.length > 1 ? (
                     <button className="button button-secondary button-small" type="button" onClick={() => removeLineItem(index)}>Remove</button>

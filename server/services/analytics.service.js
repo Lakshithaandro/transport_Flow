@@ -124,9 +124,9 @@ function getFuelAnalytics(fuelLogs) {
       const costPerGallon = Number(fuelLog.fuelQuantity) ? roundCurrency(fuelLog.fuelCost / fuelLog.fuelQuantity) : 0
       const reasons = []
 
-      if (highCostThreshold && fuelLog.fuelCost > highCostThreshold) reasons.push(`Fuel cost is above the current average log cost of $${averageFuelLogCost}.`)
+      if (highCostThreshold && fuelLog.fuelCost > highCostThreshold) reasons.push(`Fuel cost is above the current average log cost of ₹${averageFuelLogCost.toLocaleString('en-IN')}.`)
       if (highGallonThreshold && fuelLog.fuelQuantity > highGallonThreshold) reasons.push(`Gallons are above the current average log quantity of ${averageGallonsPerLog}.`)
-      if (highCostPerGallonThreshold && costPerGallon > highCostPerGallonThreshold) reasons.push(`Cost per gallon (${costPerGallon}) is above the current average of $${averageCostPerGallon}.`)
+      if (highCostPerGallonThreshold && costPerGallon > highCostPerGallonThreshold) reasons.push(`Cost per gallon (₹${costPerGallon.toLocaleString('en-IN')}) is above the current average of ₹${averageCostPerGallon.toLocaleString('en-IN')}.`)
 
       return {
         id: String(fuelLog._id),

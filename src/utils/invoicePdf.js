@@ -1,10 +1,5 @@
 import { jsPDF } from 'jspdf'
-
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-})
+import { formatCurrencyINR } from './currency.js'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -63,27 +58,27 @@ export function exportInvoicePdf(invoice) {
   invoice.lineItems?.forEach((item) => {
     doc.text(item.description || 'Line item', 14, y)
     doc.text(String(item.quantity), 110, y)
-    doc.text(currencyFormatter.format(item.unitPrice), 130, y)
-    doc.text(currencyFormatter.format(item.amount), 170, y)
+    doc.text(formatCurrencyINR(item.unitPrice), 130, y)
+    doc.text(formatCurrencyINR(item.amount), 170, y)
     y += 7
   })
 
   y += 5
   doc.line(110, y, 196, y)
   y += 8
-  writeLine(doc, 'Subtotal', currencyFormatter.format(invoice.subtotal), 120, y)
+  writeLine(doc, 'Subtotal', formatCurrencyINR(invoice.subtotal), 120, y)
   y += 7
-  writeLine(doc, 'Tax', currencyFormatter.format(invoice.taxAmount), 120, y)
+  writeLine(doc, 'Tax', formatCurrencyINR(invoice.taxAmount), 120, y)
   y += 7
-  writeLine(doc, 'GST', currencyFormatter.format(invoice.gstAmount), 120, y)
+  writeLine(doc, 'GST', formatCurrencyINR(invoice.gstAmount), 120, y)
   y += 7
-  writeLine(doc, 'Discount', currencyFormatter.format(invoice.discountAmount), 120, y)
+  writeLine(doc, 'Discount', formatCurrencyINR(invoice.discountAmount), 120, y)
   y += 7
-  writeLine(doc, 'Total', currencyFormatter.format(invoice.totalAmount), 120, y)
+  writeLine(doc, 'Total', formatCurrencyINR(invoice.totalAmount), 120, y)
   y += 7
-  writeLine(doc, 'Amount Paid', currencyFormatter.format(invoice.amountPaid), 120, y)
+  writeLine(doc, 'Amount Paid', formatCurrencyINR(invoice.amountPaid), 120, y)
   y += 7
-  writeLine(doc, 'Balance Due', currencyFormatter.format(invoice.balanceDue), 120, y)
+  writeLine(doc, 'Balance Due', formatCurrencyINR(invoice.balanceDue), 120, y)
 
   if (invoice.notes) {
     y += 14

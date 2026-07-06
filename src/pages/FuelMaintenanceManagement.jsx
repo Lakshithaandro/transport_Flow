@@ -10,13 +10,8 @@ import Toolbar from '../components/ui/Toolbar.jsx'
 import useAuth from '../context/useAuth.js'
 import { fuelMaintenanceApi } from '../services/fuelMaintenanceApi.js'
 import { vehicleDriverApi } from '../services/vehicleDriverApi.js'
+import { formatCurrencyINR } from '../utils/currency.js'
 import { isAfterDate, isBeforeToday, todayDateInputValue } from '../utils/date.js'
-
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-})
 
 const emptyFuelForm = {
   vehicleId: '',
@@ -284,7 +279,7 @@ export default function FuelMaintenanceManagement() {
     { key: 'vehicleName', label: 'Vehicle', render: (fuelLog) => <strong className="cell-primary">{fuelLog.vehicleName}</strong> },
     { key: 'driverName', label: 'Driver' },
     { key: 'fuelQuantity', label: 'Quantity', render: (fuelLog) => `${fuelLog.fuelQuantity} gal` },
-    { key: 'fuelCost', label: 'Fuel cost', render: (fuelLog) => currencyFormatter.format(fuelLog.fuelCost) },
+    { key: 'fuelCost', label: 'Fuel cost', render: (fuelLog) => formatCurrencyINR(fuelLog.fuelCost) },
     { key: 'fuelStation', label: 'Station' },
     { key: 'odometerReading', label: 'Odometer', render: (fuelLog) => Number(fuelLog.odometerReading).toLocaleString() },
     { key: 'date', label: 'Date', render: (fuelLog) => toDateInputValue(fuelLog.date) },
@@ -309,7 +304,7 @@ export default function FuelMaintenanceManagement() {
     { key: 'vehicleName', label: 'Vehicle', render: (record) => <strong className="cell-primary">{record.vehicleName}</strong> },
     { key: 'serviceType', label: 'Service' },
     { key: 'nextServiceDate', label: 'Next service', render: (record) => toDateInputValue(record.nextServiceDate) },
-    { key: 'cost', label: 'Cost', render: (record) => currencyFormatter.format(record.cost) },
+    { key: 'cost', label: 'Cost', render: (record) => formatCurrencyINR(record.cost) },
     { key: 'mechanicName', label: 'Mechanic' },
     { key: 'status', label: 'Status', render: (record) => <StatusBadge status={record.status} /> },
     { key: 'reminderDate', label: 'Reminder', render: (record) => toDateInputValue(record.reminderDate) },
@@ -343,10 +338,10 @@ export default function FuelMaintenanceManagement() {
       {isLoading ? <Card title="Loading records"><p>Preparing fuel and maintenance records.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Fuel and maintenance summary">
-        <StatCard label="Total Fuel Cost" value={currencyFormatter.format(summary.totalFuelCost)} helper="Recorded fuel spend" tone="info" />
+        <StatCard label="Total Fuel Cost" value={formatCurrencyINR(summary.totalFuelCost)} helper="Recorded fuel spend" tone="info" />
         <StatCard label="Average Mileage" value={Number(summary.averageMileage).toLocaleString()} helper="Average odometer reading" tone="success" />
         <StatCard label="Vehicles Due" value={summary.vehiclesDueForService} helper="Scheduled or overdue service" tone="warning" />
-        <StatCard label="Maintenance Cost" value={currencyFormatter.format(summary.totalMaintenanceCost)} helper="Total service cost" tone="neutral" />
+        <StatCard label="Maintenance Cost" value={formatCurrencyINR(summary.totalMaintenanceCost)} helper="Total service cost" tone="neutral" />
       </section>
 
       <section className="content-grid">
