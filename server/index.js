@@ -66,11 +66,11 @@ res.status(error.status || 500).json({ message: error.message || 'Server error' 
 
 connectDb()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`Server listening on port ${port}`)
+    app.listen(port, '0.0.0.0', () => {
+  console.log(`Server listening on port ${port}`)
+})
     })
-  })
-  .catch((error) => {
+  ((error) => {
     console.error('Failed to connect database', error)
     process.exit(1)
   })
