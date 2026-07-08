@@ -29,15 +29,15 @@ dotenv.config({ path: path.join(__dirname, '.env') })
 const app = express()
 const port = process.env.PORT || 5000
 const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean)
+.split(',')
+.map((origin) => origin.trim())
+.filter(Boolean)
 
 app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'transportflow-fuel-maintenance-api' })
+res.json({ status: 'ok', service: 'transportflow-fuel-maintenance-api' })
 })
 
 app.use('/api/auth', authRouter)
@@ -55,21 +55,22 @@ app.use('/api/analytics', requireAuth, analyticsRouter)
 app.use('/api/ai', requireAuth, authorizeAdmin, aiRouter)
 
 app.use((req, res) => {
-  res.status(404).json({ message: 'API route not found' })
+res.status(404).json({ message: 'API route not found' })
 })
 
 app.use((error, req, res, next) => {
-  void next
-  console.error(error)
-  res.status(error.status || 500).json({ message: error.message || 'Server error' })
+void next
+console.error(error)
+res.status(error.status || 500).json({ message: error.message || 'Server error' })
 })
 
 connectDb()
   .then(() => {
-    console.log('Database connected')
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`)
+    })
   })
   .catch((error) => {
     console.error('Failed to connect database', error)
+    process.exit(1)
   })
-
-export default app
