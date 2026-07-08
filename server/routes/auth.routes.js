@@ -4,7 +4,7 @@ import { authenticateUser } from '../middleware/auth.js'
 import { createAuthToken, revokeAuthToken } from '../services/authTokenService.js'
 import { validate } from '../middleware/validate.js'
 import User from '../models/User.js'
-import { loginSchema, resetPasswordSchema, signupSchema } from '../schemas/auth.schema.js'
+import { loginSchema, resetPasswordSchema } from '../schemas/auth.schema.js'
 import { logAdminActivity } from '../services/adminActivityService.js'
 
 const router = express.Router()
@@ -19,7 +19,12 @@ function getAdminEmailSet() {
 }
 
 function roleForEmail(email) {
-  return getAdminEmailSet().has(email.toLowerCase()) ? 'admin' : 'user'
+  return getAdminEmailSet().has(email.toLowerCase()) ? 'admin' : 'manager'
+}
+
+function normalizeRole(user) {
+  if (user.role === 'user') user.role = 'manager'
+  return user
 }
 
 function sanitizeUser(user) {
@@ -28,8 +33,10 @@ function sanitizeUser(user) {
     uid: user._id.toString(),
     email: user.email,
     displayName: user.displayName,
+    phone: user.phone || '',
     role: user.role,
     status: user.status,
+    passwordResetRequired: user.passwordResetRequired || false,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -41,41 +48,6 @@ async function sendAuthResponse(res, user) {
   res.json({ token, user: sanitizeUser(user) })
 }
 
-router.post('/signup', validate(signupSchema), async (req, res, next) => {
-  try {
-    const email = req.body.email.toLowerCase()
-    const existingUser = await User.findOne({ email })
-
-    if (existingUser) {
-      return res.status(409).json({ message: 'An account already exists for this email' })
-    }
-
-    const passwordHash = await bcrypt.hash(req.body.password, 12)
-    const user = await User.create({
-      firebaseUid: email,
-      email,
-      displayName: req.body.displayName,
-      passwordHash,
-      role: roleForEmail(email),
-      status: 'active',
-      lastLoginAt: new Date(),
-    })
-
-    if (user.role === 'admin') {
-      logAdminActivity({ user: { uid: user._id.toString(), email: user.email, displayName: user.displayName, role: user.role } }, {
-        action: 'login',
-        targetType: 'user',
-        targetId: user._id,
-        metadata: { email: user.email, source: 'signup' },
-      })
-    }
-
-    return await sendAuthResponse(res, user)
-  } catch (error) {
-    return next(error)
-  }
-})
-
 router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
     const email = req.body.email.toLowerCase()
@@ -85,6 +57,8 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid email or password' })
     }
 
+    normalizeRole(user)
+
     const passwordMatches = await bcrypt.compare(req.body.password, user.passwordHash)
 
     if (!passwordMatches) {
@@ -92,7 +66,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     }
 
     if (user.status === 'disabled') {
-      return res.status(403).json({ message: 'User account is disabled' })
+      return res.status(403).json({ message: 'Account is disabled. Contact an administrator.' })
     }
 
     const allowedRole = roleForEmail(user.email)
@@ -106,7 +80,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     if (user.role === 'admin') {
       logAdminActivity({ user: { uid: user._id.toString(), email: user.email, displayName: user.displayName, role: user.role } }, {
         action: 'login',
-        targetType: 'user',
+        targetType: 'account',
         targetId: user._id,
         metadata: { email: user.email, source: 'login' },
       })
@@ -128,11 +102,13 @@ router.post('/logout', authenticateUser, async (req, res, next) => {
 })
 
 router.post('/reset-password', validate(resetPasswordSchema), (req, res) => {
-  res.json({ message: 'Password reset email is not configured. Please create a new account or ask an administrator for help.' })
+  void req
+  res.json({ message: 'Password reset email is not configured. Ask an administrator for help.' })
 })
 
 router.get('/me', authenticateUser, async (req, res, next) => {
   try {
+    normalizeRole(req.appUser)
     req.appUser.lastLoginAt = new Date()
     await req.appUser.save()
 

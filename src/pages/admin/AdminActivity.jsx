@@ -67,7 +67,7 @@ export default function AdminActivity() {
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="Admin" title="Activity Logs" description="Review admin actions including login, role changes, user deletes, and shipment updates." />
+      <PageHeader eyebrow="Admin" title="Activity Logs" description="Review admin actions including logins, manager account changes, and shipment updates." />
 
       {error ? <p className="auth-error">{error}</p> : null}
 

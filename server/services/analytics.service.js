@@ -530,7 +530,7 @@ export async function buildAnalytics(createdByUid) {
     routeOptimization,
     capabilities,
     dataNotes: [
-      'Revenue, fuel, and maintenance analytics use authenticated operational records scoped to the signed-in user.',
+      'Revenue, fuel, and maintenance analytics use authenticated operational records scoped to the signed-in account.',
       'Fleet, driver, customer, route, and trip analytics use TransportFlow workspace records currently available to analytics.',
       'Route optimization uses stored distance and estimated hours with fuel assumptions; no live traffic, GPS, weather, toll, or map API data is available.',
       'Fuel intelligence can flag anomaly indicators only. It cannot confirm fuel theft, leakage, card misuse, location mismatch, or driver intent without sensor, fuel-card, GPS, or inspection data.',

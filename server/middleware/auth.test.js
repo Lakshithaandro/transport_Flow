@@ -22,8 +22,8 @@ describe('authorizeAdmin', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
-  it('returns 403 for authenticated non-admin users', () => {
-    const req = { user: { role: 'user' } }
+  it('returns 403 for authenticated manager accounts', () => {
+    const req = { user: { role: 'manager' } }
     const res = mockResponse()
     const next = vi.fn()
 
@@ -34,7 +34,7 @@ describe('authorizeAdmin', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
-  it('allows admin users through', () => {
+  it('allows admin accounts through', () => {
     const req = { user: { role: 'admin' } }
     const res = mockResponse()
     const next = vi.fn()

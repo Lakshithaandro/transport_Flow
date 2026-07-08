@@ -4,31 +4,30 @@ import Badge from '../components/ui/Badge.jsx'
 import Field from '../components/ui/Field.jsx'
 import useAuth from '../context/useAuth.js'
 
+function isAllowedRedirect(role, path) {
+  if (!path || path === '/login') return false
+  if (role === 'admin') return true
+  if (role === 'manager') return !path.startsWith('/admin') && path !== '/logistics-assistant'
+  return false
+}
+
 export default function Login() {
-  const [mode, setMode] = useState('signin')
+  const [loginRole, setLoginRole] = useState('manager')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { login, signup } = useAuth()
+  const { login, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const isSignup = mode === 'signup'
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
-
-    if (isSignup && password !== confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
-
     setIsSubmitting(true)
-    const result = isSignup ? await signup({ email, password }) : await login({ email, password })
+
+    const result = await login({ email, password })
     setIsSubmitting(false)
 
     if (!result.ok) {
@@ -36,16 +35,16 @@ export default function Login() {
       return
     }
 
-    navigate(location.state?.from || '/vehicles-drivers', { replace: true })
-  }
+    const accountRole = result.user?.role
+    if (accountRole !== loginRole) {
+      await logout()
+      setError(loginRole === 'admin' ? 'Use an admin account for Admin Login.' : 'Use a manager account for Manager Login.')
+      return
+    }
 
-  const switchMode = (nextMode = isSignup ? 'signin' : 'signup') => {
-    setMode(nextMode)
-    setError('')
-    setPassword('')
-    setConfirmPassword('')
-    setShowPassword(false)
-    setShowConfirmPassword(false)
+    const defaultPath = accountRole === 'admin' ? '/admin/dashboard' : '/dashboard'
+    const requestedPath = location.state?.from
+    navigate(isAllowedRedirect(accountRole, requestedPath) ? requestedPath : defaultPath, { replace: true })
   }
 
   return (
@@ -61,8 +60,25 @@ export default function Login() {
 
         <div>
           <Badge tone="info">Secure access</Badge>
-          <h1>{isSignup ? 'Create your TransportFlow account.' : 'Sign in to manage transport operations.'}</h1>
-          <p>{isSignup ? 'Create an account to access the TransportFlow workspace.' : 'Use your account credentials to access protected operations modules.'}</p>
+          <h1>Sign in to TransportFlow AI.</h1>
+          <p>Use your admin or manager credentials to access authorized transport operations modules.</p>
+        </div>
+
+        <div className="inline-group" role="group" aria-label="Login type">
+          <button
+            className={`button ${loginRole === 'admin' ? 'button-primary' : 'button-secondary'} button-small`}
+            type="button"
+            onClick={() => { setLoginRole('admin'); setError('') }}
+          >
+            Admin Login
+          </button>
+          <button
+            className={`button ${loginRole === 'manager' ? 'button-primary' : 'button-secondary'} button-small`}
+            type="button"
+            onClick={() => { setLoginRole('manager'); setError('') }}
+          >
+            Manager Login
+          </button>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -84,37 +100,15 @@ export default function Login() {
               </button>
             </div>
           </Field>
-          {isSignup ? (
-            <Field label="Confirm Password">
-              <div className="password-control">
-                <input
-                  className="form-control"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  required
-                  minLength="6"
-                />
-                <button className="button button-secondary button-small" type="button" onClick={() => setShowConfirmPassword((current) => !current)}>
-                  {showConfirmPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </Field>
-          ) : null}
           {error ? <p className="auth-error">{error}</p> : null}
           <button className="button button-primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Please wait...' : isSignup ? 'Create account' : 'Sign in'}
+            {isSubmitting ? 'Please wait...' : loginRole === 'admin' ? 'Admin Login' : 'Manager Login'}
           </button>
         </form>
 
         <div className="auth-hint">
-          <strong>{isSignup ? 'Already have an account?' : 'Need an account?'}</strong>
-          <span>{isSignup ? 'Switch back to sign in if your account already exists.' : 'Create an account directly from this screen.'}</span>
-          <div className="inline-group">
-            <button className="button button-secondary button-small" type="button" onClick={() => switchMode()}>
-              {isSignup ? 'Go to sign in' : 'Create new account'}
-            </button>
-          </div>
+          <strong>Need an account?</strong>
+          <span>Manager accounts are created by an administrator. Contact your TransportFlow AI admin for access.</span>
         </div>
       </section>
     </main>

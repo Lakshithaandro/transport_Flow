@@ -19,6 +19,11 @@ function storeToken(token) {
   }
 }
 
+function normalizeAccount(account) {
+  if (!account) return account
+  return { ...account, role: account.role === 'user' ? 'manager' : account.role }
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(getStoredToken)
   const [user, setUser] = useState(null)
@@ -40,7 +45,7 @@ export function AuthProvider({ children }) {
     const currentToken = token || getStoredToken()
 
     if (!currentToken) {
-      throw new Error('User is not authenticated')
+      throw new Error('Account is not authenticated')
     }
 
     return currentToken
@@ -56,7 +61,7 @@ export function AuthProvider({ children }) {
     setProfileError('')
 
     try {
-      const profile = await authApi.getCurrentUser(async () => authToken)
+      const profile = normalizeAccount(await authApi.getCurrentUser(async () => authToken))
       setUser(profile)
       setAppUser(profile)
       return profile
@@ -95,37 +100,23 @@ export function AuthProvider({ children }) {
   const login = useCallback(async ({ email, password }) => {
     try {
       const result = await authApi.login({ email, password })
+      const account = normalizeAccount(result.user)
       storeToken(result.token)
       setToken(result.token)
-      setUser(result.user)
-      setAppUser(result.user)
+      setUser(account)
+      setAppUser(account)
       setProfileError('')
       setIsProfileReady(true)
-      return { ok: true }
+      return { ok: true, user: account }
     } catch (error) {
       return { ok: false, message: error.message || 'Sign in failed.' }
-    }
-  }, [])
-
-  const signup = useCallback(async ({ email, password, displayName = '' }) => {
-    try {
-      const result = await authApi.signup({ email, password, displayName })
-      storeToken(result.token)
-      setToken(result.token)
-      setUser(result.user)
-      setAppUser(result.user)
-      setProfileError('')
-      setIsProfileReady(true)
-      return { ok: true }
-    } catch (error) {
-      return { ok: false, message: error.message || 'Sign up failed.' }
     }
   }, [])
 
   const resetPassword = useCallback(async ({ email }) => {
     try {
       await authApi.resetPassword({ email })
-      return { ok: false, message: 'Password reset email is not configured. Create a new account or ask an administrator for help.' }
+      return { ok: false, message: 'Password reset email is not configured. Ask an administrator for help.' }
     } catch (error) {
       return { ok: false, message: error.message || 'Password reset is not configured.' }
     }
@@ -152,14 +143,14 @@ export function AuthProvider({ children }) {
       isProfileReady,
       isAuthenticated: Boolean(user && token),
       isAdmin: appUser?.role === 'admin',
+      isManager: appUser?.role === 'manager',
       login,
-      signup,
       resetPassword,
       logout,
       getAuthToken,
       refreshAppUser,
     }),
-    [user, appUser, profileError, isAuthReady, isProfileReady, token, login, signup, resetPassword, logout, getAuthToken, refreshAppUser],
+    [user, appUser, profileError, isAuthReady, isProfileReady, token, login, resetPassword, logout, getAuthToken, refreshAppUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -6,10 +6,12 @@ function toQueryString(params = {}) {
 
 export const adminApi = {
   getDashboard: (getAuthToken) => apiRequest('/api/admin/dashboard', { getAuthToken }),
-  getUsers: (params, getAuthToken) => apiRequest(`/api/admin/users?${toQueryString(params)}`, { getAuthToken }),
-  getUser: (id, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { getAuthToken }),
-  updateUser: (id, payload, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { method: 'PATCH', body: payload, getAuthToken }),
-  deleteUser: (id, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { method: 'DELETE', getAuthToken }),
+  getManagers: (params, getAuthToken) => apiRequest(`/api/admin/users?${toQueryString(params)}`, { getAuthToken }),
+  getManager: (id, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { getAuthToken }),
+  createManager: (payload, getAuthToken) => apiRequest('/api/admin/users', { method: 'POST', body: payload, getAuthToken }),
+  updateManager: (id, payload, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { method: 'PATCH', body: payload, getAuthToken }),
+  deleteManager: (id, getAuthToken) => apiRequest(`/api/admin/users/${id}`, { method: 'DELETE', getAuthToken }),
+  resetManagerPassword: (id, payload, getAuthToken) => apiRequest(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: payload, getAuthToken }),
   getShipments: (params, getAuthToken) => apiRequest(`/api/admin/shipments?${toQueryString(params)}`, { getAuthToken }),
   getShipment: (id, getAuthToken) => apiRequest(`/api/admin/shipments/${id}`, { getAuthToken }),
   updateShipment: (id, payload, getAuthToken) => apiRequest(`/api/admin/shipments/${id}`, { method: 'PATCH', body: payload, getAuthToken }),

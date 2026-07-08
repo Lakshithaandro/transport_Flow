@@ -133,7 +133,7 @@ export async function askLogisticsAssistant({ question, analytics }) {
       ],
       messages: [
         {
-          role: 'user',
+          role: 'manager',
           content: JSON.stringify({
             question,
             analytics: buildAssistantPayload(analytics),

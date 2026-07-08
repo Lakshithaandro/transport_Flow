@@ -71,13 +71,13 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="Admin" title="Admin Dashboard" description="Monitor platform users, shipment movement, and recent admin activity." />
+      <PageHeader eyebrow="Admin" title="Admin Dashboard" description="Monitor manager accounts, shipment movement, and recent admin activity." />
 
       {error ? <p className="auth-error">{error}</p> : null}
       {isLoading ? <Card title="Loading dashboard"><p>Loading admin analytics and activity.</p></Card> : null}
 
       <section className="stat-grid" aria-label="Admin statistics">
-        <StatCard label="Total Users" value={stats.totalUsers || 0} helper="Active platform accounts" tone="info" />
+        <StatCard label="Total Managers" value={stats.totalManagers || 0} helper="Active manager accounts" tone="info" />
         <StatCard label="Total Shipments" value={stats.totalShipments || 0} helper="All shipment records" tone="neutral" />
         <StatCard label="Active Shipments" value={stats.activeShipments || 0} helper="Currently in transit" tone="warning" />
         <StatCard label="Delivered" value={stats.deliveredShipments || 0} helper="Completed shipments" tone="success" />

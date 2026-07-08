@@ -6,12 +6,12 @@ export default function AdminAccessDenied({ message }) {
     <main className="page-container">
       <div className="page-stack">
         <PageHeader
-          eyebrow="Admin Access"
+          eyebrow="Restricted Access"
           title="Access denied"
-          description="This account does not have permission to open the TransportFlow AI admin panel."
+          description="This account does not have permission to open this admin-only area."
         />
         <Card title="Admin role required">
-          <p>{message || 'Ask an administrator to assign the admin role to your account.'}</p>
+          <p>{message || 'Ask an administrator if you need access to this page.'}</p>
         </Card>
       </div>
     </main>

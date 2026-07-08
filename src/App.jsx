@@ -15,6 +15,7 @@ import ReportsAnalytics from './pages/ReportsAnalytics.jsx'
 import VehicleDriverManagement from './pages/VehicleDriverManagement.jsx'
 import AdminActivity from './pages/admin/AdminActivity.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import AdminSettings from './pages/admin/AdminSettings.jsx'
 import AdminShipments from './pages/admin/AdminShipments.jsx'
 import AdminUsers from './pages/admin/AdminUsers.jsx'
 
@@ -48,12 +49,13 @@ export default function App() {
             <Route path="/fuel-maintenance" element={<ProtectedPage><FuelMaintenanceManagement /></ProtectedPage>} />
             <Route path="/invoices-payments" element={<ProtectedPage><InvoicePaymentManagement /></ProtectedPage>} />
             <Route path="/reports-analytics" element={<ProtectedPage><ReportsAnalytics /></ProtectedPage>} />
-            <Route path="/logistics-assistant" element={<ProtectedPage><LogisticsAssistant /></ProtectedPage>} />
+            <Route path="/logistics-assistant" element={<AdminPage><LogisticsAssistant /></AdminPage>} />
             <Route path="/admin" element={<AdminPage><Navigate to="/admin/dashboard" replace /></AdminPage>} />
             <Route path="/admin/dashboard" element={<AdminPage><AdminDashboard /></AdminPage>} />
             <Route path="/admin/users" element={<AdminPage><AdminUsers /></AdminPage>} />
             <Route path="/admin/shipments" element={<AdminPage><AdminShipments /></AdminPage>} />
             <Route path="/admin/activity" element={<AdminPage><AdminActivity /></AdminPage>} />
+            <Route path="/admin/settings" element={<AdminPage><AdminSettings /></AdminPage>} />
             <Route path="*" element={<ProtectedPage><NotFound /></ProtectedPage>} />
           </Routes>
         </AuthProvider>

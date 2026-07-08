@@ -52,7 +52,7 @@ app.use('/api/maintenance', requireAuth, maintenanceRouter)
 app.use('/api/fuel-maintenance', requireAuth, summaryRouter)
 app.use('/api/invoices', requireAuth, invoicesRouter)
 app.use('/api/analytics', requireAuth, analyticsRouter)
-app.use('/api/ai', requireAuth, aiRouter)
+app.use('/api/ai', requireAuth, authorizeAdmin, aiRouter)
 
 app.use((req, res) => {
   res.status(404).json({ message: 'API route not found' })
@@ -66,11 +66,10 @@ app.use((error, req, res, next) => {
 
 connectDb()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`Server listening on http://localhost:${port}`)
-    })
+    console.log('Database connected')
   })
   .catch((error) => {
-    console.error('Failed to start server', error)
-    process.exit(1)
+    console.error('Failed to connect database', error)
   })
+
+export default app

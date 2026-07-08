@@ -16,9 +16,13 @@ export async function authenticateUser(req, res, next) {
     }
 
     const appUser = tokenResult.user
+    if (appUser.role === 'user') {
+      appUser.role = 'manager'
+      await appUser.save()
+    }
 
     if (appUser.status === 'disabled') {
-      return res.status(403).json({ message: 'User account is disabled' })
+      return res.status(403).json({ message: 'Account is disabled. Contact an administrator.' })
     }
 
     req.user = {

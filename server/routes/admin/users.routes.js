@@ -1,9 +1,14 @@
+import bcrypt from 'bcryptjs'
 import express from 'express'
 import mongoose from 'mongoose'
-import { getFirebaseAdmin } from '../../config/firebaseAdmin.js'
 import { validate, validateQuery } from '../../middleware/validate.js'
 import User from '../../models/User.js'
-import { adminUsersQuerySchema, updateAdminUserSchema } from '../../schemas/adminUser.schema.js'
+import {
+  adminUsersQuerySchema,
+  createAdminUserSchema,
+  resetManagerPasswordSchema,
+  updateAdminUserSchema,
+} from '../../schemas/adminUser.schema.js'
 import { logAdminActivity } from '../../services/adminActivityService.js'
 
 const router = express.Router()
@@ -12,14 +17,23 @@ function escapeRegExp(value = '') {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function sanitizeUser(user) {
+function normalizeRole(user) {
+  if (user?.role === 'user') user.role = 'manager'
+  return user
+}
+
+function sanitizeManager(user) {
+  normalizeRole(user)
+
   return {
     id: user._id,
     firebaseUid: user.firebaseUid,
     email: user.email,
     displayName: user.displayName,
-    role: user.role,
+    phone: user.phone || '',
+    role: 'manager',
     status: user.status,
+    passwordResetRequired: user.passwordResetRequired || false,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -28,26 +42,18 @@ function sanitizeUser(user) {
 
 function validateObjectId(id, res) {
   if (mongoose.Types.ObjectId.isValid(id)) return true
-  res.status(400).json({ message: 'Invalid user id' })
+  res.status(400).json({ message: 'Invalid manager id' })
   return false
 }
 
-async function assertAdminSafety(targetUser, updates, actorUserId) {
-  const isTargetAdmin = targetUser.role === 'admin'
-  const removesAdminRole = updates.role === 'user'
-  const disablesAdmin = updates.status === 'disabled'
-  const touchesAdminAccess = isTargetAdmin && (removesAdminRole || disablesAdmin)
-
-  if (!touchesAdminAccess) return
-
-  const activeAdminCount = await User.countDocuments({ role: 'admin', status: 'active' })
-  const isSelf = targetUser._id.toString() === actorUserId
-
-  if (activeAdminCount <= 1 || isSelf) {
-    const error = new Error('Cannot remove admin access because it would risk locking out the admin panel')
-    error.status = 400
-    throw error
+async function findManagerById(id) {
+  const manager = await User.findOne({ _id: id, role: { $in: ['manager', 'user'] } })
+  if (manager?.role === 'user') {
+    manager.role = 'manager'
+    await manager.save()
   }
+
+  return manager
 }
 
 router.get('/', validateQuery(adminUsersQuerySchema), async (req, res, next) => {
@@ -56,14 +62,13 @@ router.get('/', validateQuery(adminUsersQuerySchema), async (req, res, next) => 
     const page = Number(queryParams.page) || 1
     const limit = Math.min(Number(queryParams.limit) || 10, 100)
     const skip = (page - 1) * limit
-    const query = {}
+    const query = { role: { $in: ['manager', 'user'] } }
 
     if (queryParams.search) {
       const searchRegex = new RegExp(escapeRegExp(queryParams.search), 'i')
-      query.$or = [{ email: searchRegex }, { displayName: searchRegex }]
+      query.$or = [{ email: searchRegex }, { displayName: searchRegex }, { phone: searchRegex }]
     }
 
-    if (queryParams.role !== 'All') query.role = queryParams.role
     if (queryParams.status !== 'All') query.status = queryParams.status
 
     const sortFieldMap = { displayName: 'displayName', email: 'email', createdAt: 'createdAt' }
@@ -76,7 +81,7 @@ router.get('/', validateQuery(adminUsersQuerySchema), async (req, res, next) => 
     ])
 
     res.json({
-      items: items.map(sanitizeUser),
+      items: items.map(sanitizeManager),
       page,
       limit,
       total,
@@ -87,17 +92,52 @@ router.get('/', validateQuery(adminUsersQuerySchema), async (req, res, next) => 
   }
 })
 
+router.post('/', validate(createAdminUserSchema), async (req, res, next) => {
+  try {
+    const email = req.body.email.toLowerCase()
+    const existingManager = await User.findOne({ email })
+
+    if (existingManager) {
+      return res.status(409).json({ message: 'A manager account already exists for this email' })
+    }
+
+    const passwordHash = await bcrypt.hash(req.body.password, 12)
+    const manager = await User.create({
+      firebaseUid: email,
+      email,
+      displayName: req.body.displayName,
+      phone: req.body.phone || '',
+      passwordHash,
+      role: 'manager',
+      status: 'active',
+      passwordResetRequired: true,
+      passwordResetAt: new Date(),
+    })
+
+    logAdminActivity(req, {
+      action: 'manager_created',
+      targetType: 'manager',
+      targetId: manager._id,
+      metadata: { email: manager.email },
+    })
+
+    return res.status(201).json(sanitizeManager(manager))
+  } catch (error) {
+    return next(error)
+  }
+})
+
 router.get('/:id', async (req, res, next) => {
   try {
     if (!validateObjectId(req.params.id, res)) return
 
-    const user = await User.findById(req.params.id)
+    const manager = await findManagerById(req.params.id)
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager not found' })
     }
 
-    return res.json(sanitizeUser(user))
+    return res.json(sanitizeManager(manager))
   } catch (error) {
     return next(error)
   }
@@ -107,46 +147,67 @@ router.patch('/:id', validate(updateAdminUserSchema), async (req, res, next) => 
   try {
     if (!validateObjectId(req.params.id, res)) return
 
-    const user = await User.findById(req.params.id)
+    const manager = await findManagerById(req.params.id)
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager not found' })
     }
 
-    await assertAdminSafety(user, req.body, req.user.userId)
+    const previousStatus = manager.status
 
-    const previousRole = user.role
-    const previousStatus = user.status
+    if (req.body.displayName !== undefined) manager.displayName = req.body.displayName
+    if (req.body.phone !== undefined) manager.phone = req.body.phone
+    if (req.body.status !== undefined) manager.status = req.body.status
+    manager.role = 'manager'
 
-    if (req.body.displayName !== undefined) user.displayName = req.body.displayName
-    if (req.body.role !== undefined) user.role = req.body.role
-    if (req.body.status !== undefined) user.status = req.body.status
+    await manager.save()
 
-    await user.save()
-
-    if (req.body.status !== undefined) {
-      await getFirebaseAdmin().updateUser(user.firebaseUid, { disabled: user.status === 'disabled' })
-    }
-
-    if (previousRole !== user.role) {
+    if (previousStatus !== manager.status) {
       logAdminActivity(req, {
-        action: 'role_changed',
-        targetType: 'user',
-        targetId: user._id,
-        metadata: { email: user.email, previousRole, role: user.role },
+        action: manager.status === 'disabled' ? 'manager_disabled' : 'manager_enabled',
+        targetType: 'manager',
+        targetId: manager._id,
+        metadata: { email: manager.email, previousStatus, status: manager.status },
+      })
+    } else {
+      logAdminActivity(req, {
+        action: 'manager_updated',
+        targetType: 'manager',
+        targetId: manager._id,
+        metadata: { email: manager.email },
       })
     }
 
-    if (previousStatus !== user.status) {
-      logAdminActivity(req, {
-        action: user.status === 'disabled' ? 'user_disabled' : 'user_enabled',
-        targetType: 'user',
-        targetId: user._id,
-        metadata: { email: user.email, previousStatus, status: user.status },
-      })
+    return res.json(sanitizeManager(manager))
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.post('/:id/reset-password', validate(resetManagerPasswordSchema), async (req, res, next) => {
+  try {
+    if (!validateObjectId(req.params.id, res)) return
+
+    const manager = await findManagerById(req.params.id)
+
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager not found' })
     }
 
-    return res.json(sanitizeUser(user))
+    manager.passwordHash = await bcrypt.hash(req.body.password, 12)
+    manager.passwordResetRequired = true
+    manager.passwordResetAt = new Date()
+    manager.role = 'manager'
+    await manager.save()
+
+    logAdminActivity(req, {
+      action: 'manager_password_reset',
+      targetType: 'manager',
+      targetId: manager._id,
+      metadata: { email: manager.email },
+    })
+
+    return res.json({ message: 'Manager password reset successfully.', manager: sanitizeManager(manager) })
   } catch (error) {
     return next(error)
   }
@@ -156,26 +217,22 @@ router.delete('/:id', async (req, res, next) => {
   try {
     if (!validateObjectId(req.params.id, res)) return
 
-    const user = await User.findById(req.params.id)
+    const manager = await findManagerById(req.params.id)
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager not found' })
     }
 
-    await assertAdminSafety(user, { status: 'disabled' }, req.user.userId)
-
-    user.status = 'disabled'
-    await user.save()
-    await getFirebaseAdmin().updateUser(user.firebaseUid, { disabled: true })
+    await User.deleteOne({ _id: manager._id })
 
     logAdminActivity(req, {
-      action: 'user_deleted',
-      targetType: 'user',
-      targetId: user._id,
-      metadata: { email: user.email },
+      action: 'manager_deleted',
+      targetType: 'manager',
+      targetId: manager._id,
+      metadata: { email: manager.email },
     })
 
-    return res.json({ message: 'User deleted' })
+    return res.json({ message: 'Manager deleted' })
   } catch (error) {
     return next(error)
   }

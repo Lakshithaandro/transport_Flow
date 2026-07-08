@@ -29,13 +29,13 @@ describe('AdminRoute', () => {
     expect(screen.getByText(/checking admin access/i)).toBeInTheDocument()
   })
 
-  it('shows access denied for non-admin users', () => {
+  it('shows access denied for manager accounts', () => {
     renderAdminRoute({ isAuthenticated: true, isAuthReady: true, isProfileReady: true, isAdmin: false, profileError: '' })
 
     expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument()
   })
 
-  it('renders children for admin users', () => {
+  it('renders children for admin accounts', () => {
     renderAdminRoute({ isAuthenticated: true, isAuthReady: true, isProfileReady: true, isAdmin: true, profileError: '' })
 
     expect(screen.getByText('Admin content')).toBeInTheDocument()

@@ -14,7 +14,7 @@ function monthKey(value) {
 router.get('/', async (req, res, next) => {
   try {
     const [
-      totalUsers,
+      totalManagers,
       totalShipments,
       activeShipments,
       deliveredShipments,
@@ -24,7 +24,7 @@ router.get('/', async (req, res, next) => {
       recentActivities,
       recentShipments,
     ] = await Promise.all([
-      User.countDocuments({ status: 'active' }),
+      User.countDocuments({ role: { $in: ['manager', 'user'] }, status: 'active' }),
       Shipment.countDocuments(),
       Shipment.countDocuments({ status: 'In Transit' }),
       Shipment.countDocuments({ status: 'Delivered' }),
@@ -43,7 +43,7 @@ router.get('/', async (req, res, next) => {
 
     res.json({
       stats: {
-        totalUsers,
+        totalManagers,
         totalShipments,
         activeShipments,
         deliveredShipments,
@@ -56,7 +56,7 @@ router.get('/', async (req, res, next) => {
       recentActivities,
       recentShipments,
       quickActions: [
-        { label: 'Manage Users', to: '/admin/users' },
+        { label: 'Manage Managers', to: '/admin/users' },
         { label: 'Review Shipments', to: '/admin/shipments' },
         { label: 'View Activity', to: '/admin/activity' },
       ],
