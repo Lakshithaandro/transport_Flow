@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Badge from '../components/ui/Badge.jsx'
 import Field from '../components/ui/Field.jsx'
@@ -18,9 +18,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { login, logout } = useAuth()
+  const { isAuthenticated, isAuthReady, isAdmin, login, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated) return
+
+    navigate(isAdmin ? '/admin/dashboard' : '/dashboard', { replace: true })
+  }, [isAdmin, isAuthenticated, isAuthReady, navigate])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
