@@ -43,6 +43,21 @@ function toDateInputValue(value) {
   return new Date(value).toISOString().slice(0, 10)
 }
 
+const MILES_TO_KILOMETERS = 1.60934
+const MAX_ROUTE_DISTANCE_KILOMETERS = 16093
+
+function milesToKilometers(value) {
+  return Math.round((Number(value) || 0) * MILES_TO_KILOMETERS)
+}
+
+function kilometersToMiles(value) {
+  return Math.round(((Number(value) || 0) / MILES_TO_KILOMETERS) * 100) / 100
+}
+
+function formatKilometers(value) {
+  return `${milesToKilometers(value).toLocaleString()} km`
+}
+
 function tripLabel(trip) {
   return trip.id || `TRP-${String(getRecordId(trip)).slice(-6).toUpperCase()}`
 }
@@ -205,11 +220,11 @@ export default function CustomerRouteTripManagement() {
     const nameError = validateBusinessText(sanitizedForm.name, 'Route name', { min: 3, max: 100 })
     const originError = validateLocation(sanitizedForm.origin, 'Origin')
     const destinationError = validateLocation(sanitizedForm.destination, 'Destination')
-    const distance = parseBoundedNumber(sanitizedForm.distanceMiles, 'Distance miles', { min: 1, max: 10000 })
+    const distance = parseBoundedNumber(sanitizedForm.distanceMiles, 'Distance (km)', { min: 1, max: MAX_ROUTE_DISTANCE_KILOMETERS })
     const hours = parseBoundedNumber(sanitizedForm.estimatedHours, 'Estimated hours', { min: 0.25, max: 240 })
 
     if (nameError || originError || destinationError || distance.error || hours.error) {
-      setRouteError(nameError || originError || destinationError || distance.error || hours.error)
+      setRouteError(nameError || originError || destinationError || (distance.error ? 'Distance must be entered in kilometers.' : '') || hours.error)
       return
     }
 
@@ -223,7 +238,7 @@ export default function CustomerRouteTripManagement() {
       return
     }
 
-    const payload = { ...sanitizedForm, distanceMiles: distance.value, estimatedHours: hours.value }
+    const payload = { ...sanitizedForm, distanceMiles: kilometersToMiles(distance.value), estimatedHours: hours.value }
     setIsRouteSaving(true)
 
     try {
@@ -316,7 +331,7 @@ export default function CustomerRouteTripManagement() {
       name: route.name,
       origin: route.origin,
       destination: route.destination,
-      distanceMiles: route.distanceMiles,
+      distanceMiles: milesToKilometers(route.distanceMiles),
       estimatedHours: route.estimatedHours,
       status: route.status,
     })
@@ -422,8 +437,8 @@ export default function CustomerRouteTripManagement() {
     { key: 'destination', label: 'Destination' },
     {
       key: 'distanceMiles',
-      label: 'Miles',
-      render: (route) => Number(route.distanceMiles).toLocaleString(),
+      label: 'Distance (km)',
+      render: (route) => formatKilometers(route.distanceMiles),
     },
     {
       key: 'status',
@@ -648,17 +663,17 @@ export default function CustomerRouteTripManagement() {
                 required
               />
             </Field>
-            <Field label="Distance miles">
+            <Field label="Distance (km)">
               <input
                 className="form-control"
                 type="number"
                 min="1"
-                max="10000"
+                max={MAX_ROUTE_DISTANCE_KILOMETERS}
                 step="1"
                 inputMode="numeric"
                 value={routeForm.distanceMiles}
                 onChange={(event) => setRouteForm({ ...routeForm, distanceMiles: event.target.value })}
-                placeholder="500"
+                placeholder="500 km"
                 required
               />
             </Field>
