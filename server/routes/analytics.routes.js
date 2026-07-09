@@ -5,7 +5,10 @@ const router = express.Router()
 
 router.get('/reports', async (req, res, next) => {
   try {
-    const analytics = await buildAnalytics(req.user.uid)
+    const analytics = await buildAnalytics(req.user.uid, {
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+    })
     res.json(analytics)
   } catch (error) {
     next(error)

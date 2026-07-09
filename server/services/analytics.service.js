@@ -1,8 +1,11 @@
-import { initialCustomers, initialRoutes, initialTrips } from '../../src/data/customerRouteTripData.js'
-import { initialDrivers, initialVehicles } from '../../src/data/vehicleDriverData.js'
+import Customer from '../models/Customer.js'
+import Driver from '../models/Driver.js'
 import FuelLog from '../models/FuelLog.js'
 import Invoice from '../models/Invoice.js'
 import MaintenanceRecord from '../models/MaintenanceRecord.js'
+import RouteRecord from '../models/RouteRecord.js'
+import Trip from '../models/Trip.js'
+import Vehicle from '../models/Vehicle.js'
 
 const DEFAULT_DIESEL_COST = 4.25
 const ESTIMATED_MPG = 6.5
@@ -62,6 +65,21 @@ function mapGroupToRows(groups, keyName, valueName) {
 function getDateValue(value) {
   const timestamp = value ? new Date(value).getTime() : 0
   return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+function getDateRangeFilter(field, { startDate, endDate } = {}) {
+  const range = {}
+  if (startDate) range.$gte = new Date(`${startDate}T00:00:00.000Z`)
+  if (endDate) range.$lte = new Date(`${endDate}T23:59:59.999Z`)
+
+  return Object.keys(range).length ? { [field]: range } : {}
+}
+
+function getReportPeriod({ startDate, endDate } = {}) {
+  return {
+    startDate: startDate || null,
+    endDate: endDate || null,
+  }
 }
 
 function getInvoiceAnalytics(invoices) {
@@ -193,7 +211,7 @@ function getFuelAnalytics(fuelLogs) {
   }
 }
 
-function getFleetAnalytics(maintenanceRecords) {
+function getFleetAnalytics(vehicles, maintenanceRecords) {
   const totalMaintenanceCost = roundCurrency(sumBy(maintenanceRecords, (record) => record.cost))
   const vehiclesDueForService = maintenanceRecords.filter((record) => ['Scheduled', 'Overdue'].includes(record.status)).length
   const recordsByVehicle = groupBy(maintenanceRecords, (record) => record.vehicleName)
@@ -217,8 +235,9 @@ function getFleetAnalytics(maintenanceRecords) {
     .sort((a, b) => b.openItems - a.openItems || b.recordCount - a.recordCount || b.totalCost - a.totalCost)
     .slice(0, 8)
 
-  const healthPredictions = initialVehicles.map((vehicle) => {
-    const matchingRecords = maintenanceRecords.filter((record) => record.vehicleName === vehicle.unit || record.vehicleId === vehicle.id)
+  const healthPredictions = vehicles.map((vehicle) => {
+    const vehicleId = String(vehicle._id)
+    const matchingRecords = maintenanceRecords.filter((record) => record.vehicleName === vehicle.unit || record.vehicleId === vehicleId)
     const overdueRecord = matchingRecords.find((record) => record.status === 'Overdue')
     const upcomingRecord = matchingRecords.find((record) => {
       const remainingDays = daysUntil(record.nextServiceDate || record.reminderDate)
@@ -256,7 +275,7 @@ function getFleetAnalytics(maintenanceRecords) {
     }
 
     return {
-      id: vehicle.id,
+      id: vehicleId,
       vehicleName: vehicle.unit,
       mileage: vehicle.mileage,
       vehicleStatus: vehicle.status,
@@ -273,10 +292,10 @@ function getFleetAnalytics(maintenanceRecords) {
   })
 
   return {
-    totalVehicles: initialVehicles.length,
-    availableVehicles: initialVehicles.filter((vehicle) => vehicle.status === 'Available').length,
-    assignedVehicles: initialVehicles.filter((vehicle) => vehicle.status === 'Assigned').length,
-    maintenanceVehicles: initialVehicles.filter((vehicle) => vehicle.status === 'Maintenance').length,
+    totalVehicles: vehicles.length,
+    availableVehicles: vehicles.filter((vehicle) => vehicle.status === 'Available').length,
+    assignedVehicles: vehicles.filter((vehicle) => vehicle.status === 'Assigned').length,
+    maintenanceVehicles: vehicles.filter((vehicle) => vehicle.status === 'Maintenance').length,
     vehiclesDueForService,
     totalMaintenanceCost,
     maintenanceRecordCount: maintenanceRecords.length,
@@ -286,91 +305,92 @@ function getFleetAnalytics(maintenanceRecords) {
   }
 }
 
-function getDriverAnalytics(fuelLogs) {
-  const driverTripCounts = initialDrivers.map((driver) => ({
-    id: driver.id,
+function getDriverAnalytics(drivers, trips, fuelLogs) {
+  const driverTripCounts = drivers.map((driver) => ({
+    id: String(driver._id),
     driverName: driver.name,
-    trips: initialTrips.filter((trip) => trip.driver === driver.name).length,
+    trips: trips.filter((trip) => trip.driver === driver.name).length,
     status: driver.status,
   }))
 
   const fuelCostByDriver = mapGroupToRows(groupSum(fuelLogs, (fuelLog) => fuelLog.driverName, (fuelLog) => fuelLog.fuelCost), 'driverName', 'fuelCost')
-  const driverPerformance = initialDrivers.map((driver) => {
-    const trips = driverTripCounts.find((item) => item.driverName === driver.name)?.trips || 0
+  const driverPerformance = drivers.map((driver) => {
+    const tripsForDriver = driverTripCounts.find((item) => item.driverName === driver.name)?.trips || 0
     const fuelSpend = fuelCostByDriver.find((item) => item.driverName === driver.name)?.fuelCost || 0
-    const status = driver.status === 'Needs Review' ? 'Needs Review' : fuelSpend > 0 && trips === 0 ? 'Medium' : 'Active'
+    const status = driver.status === 'Needs Review' ? 'Needs Review' : fuelSpend > 0 && tripsForDriver === 0 ? 'Medium' : 'Active'
 
     return {
-      id: driver.id,
+      id: String(driver._id),
       driverName: driver.name,
       assignedVehicle: driver.assignedVehicle,
-      trips,
+      trips: tripsForDriver,
       fuelSpend,
       status,
       recommendation: status === 'Needs Review'
         ? 'Review license, assignment, or performance notes before dispatch.'
-        : fuelSpend > 0 && trips === 0
+        : fuelSpend > 0 && tripsForDriver === 0
           ? 'Fuel activity exists without a matching trip; verify assignment data.'
           : 'No immediate review needed from current records.',
     }
   })
 
   return {
-    totalDrivers: initialDrivers.length,
-    availableDrivers: initialDrivers.filter((driver) => driver.status === 'Available').length,
-    assignedDrivers: initialDrivers.filter((driver) => driver.status === 'Assigned').length,
-    needsReviewDrivers: initialDrivers.filter((driver) => driver.status === 'Needs Review').length,
+    totalDrivers: drivers.length,
+    availableDrivers: drivers.filter((driver) => driver.status === 'Available').length,
+    assignedDrivers: drivers.filter((driver) => driver.status === 'Assigned').length,
+    needsReviewDrivers: drivers.filter((driver) => driver.status === 'Needs Review').length,
     driverTripCounts,
     fuelCostByDriver,
     driverPerformance,
   }
 }
 
-function getOperationalAnalytics() {
-  const scheduledTrips = initialTrips.filter((trip) => trip.status === 'Scheduled').length
-  const inTransitTrips = initialTrips.filter((trip) => trip.status === 'In Transit').length
-  const delayedTrips = initialTrips.filter((trip) => trip.status === 'Delayed').length
-  const completedTrips = initialTrips.filter((trip) => trip.status === 'Completed').length
-  const activeRoutes = initialRoutes.filter((route) => route.status === 'Active').length
-  const tripsByRoute = initialRoutes.map((route) => ({
-    id: route.id,
+function getOperationalAnalytics(customers, routes, trips) {
+  const scheduledTrips = trips.filter((trip) => trip.status === 'Scheduled').length
+  const inTransitTrips = trips.filter((trip) => trip.status === 'In Transit').length
+  const delayedTrips = trips.filter((trip) => trip.status === 'Delayed').length
+  const completedTrips = trips.filter((trip) => trip.status === 'Completed').length
+  const activeRoutes = routes.filter((route) => route.status === 'Active').length
+  const tripsByRoute = routes.map((route) => ({
+    id: String(route._id),
     routeName: route.name,
-    tripCount: initialTrips.filter((trip) => trip.route === route.name).length,
-    delayedTrips: initialTrips.filter((trip) => trip.route === route.name && trip.status === 'Delayed').length,
+    tripCount: trips.filter((trip) => trip.route === route.name).length,
+    delayedTrips: trips.filter((trip) => trip.route === route.name && trip.status === 'Delayed').length,
   }))
 
   return {
-    customerCount: initialCustomers.length,
-    activeCustomerCount: initialCustomers.filter((customer) => customer.status === 'Active').length,
-    routeCount: initialRoutes.length,
+    customerCount: customers.length,
+    activeCustomerCount: customers.filter((customer) => customer.status === 'Active').length,
+    routeCount: routes.length,
     activeRouteCount: activeRoutes,
-    tripCount: initialTrips.length,
+    tripCount: trips.length,
     scheduledTrips,
     inTransitTrips,
     delayedTrips,
     completedTrips,
-    delayRate: percent(delayedTrips, initialTrips.length),
-    routeUtilization: percent(activeRoutes, initialRoutes.length),
+    delayRate: percent(delayedTrips, trips.length),
+    routeUtilization: percent(activeRoutes, routes.length),
     tripsByRoute,
     tripStatusRows: ['Scheduled', 'In Transit', 'Delayed', 'Completed'].map((status) => ({
       id: status,
       status,
-      count: initialTrips.filter((trip) => trip.status === status).length,
+      count: trips.filter((trip) => trip.status === status).length,
     })),
   }
 }
 
-function getRouteOptimization(fuelAnalytics) {
+function getRouteOptimization(routes, trips, fuelAnalytics) {
   const averageCostPerGallon = fuelAnalytics.averageCostPerGallon || DEFAULT_DIESEL_COST
-  const scoredRoutes = initialRoutes.map((route) => {
+  const scoredRoutes = routes.map((route) => {
     const estimatedGallons = roundNumber(route.distanceMiles / ESTIMATED_MPG, 2)
     const estimatedFuelCost = roundCurrency(estimatedGallons * averageCostPerGallon)
     const efficiencyScore = roundNumber(route.distanceMiles * 0.55 + route.estimatedHours * 45, 2)
-    const matchingTrips = initialTrips.filter((trip) => trip.route === route.name)
+    const matchingTrips = trips.filter((trip) => trip.route === route.name)
+    const routeId = String(route._id)
 
     return {
-      id: route.id,
-      routeId: route.id,
+      id: routeId,
+      routeId,
       routeName: route.name,
       origin: route.origin,
       destination: route.destination,
@@ -390,9 +410,44 @@ function getRouteOptimization(fuelAnalytics) {
   const fastest = [...scoredRoutes].sort((a, b) => a.estimatedHours - b.estimatedHours)[0]
   const lowestFuelCost = [...scoredRoutes].sort((a, b) => a.estimatedFuelCost - b.estimatedFuelCost)[0]
   const mostEfficient = [...scoredRoutes].sort((a, b) => a.efficiencyScore - b.efficiencyScore)[0]
-  const inefficientRoutes = [...scoredRoutes]
-    .filter((route) => route.status !== 'Active' || route.delayedTrips > 0 || route.efficiencyScore > mostEfficient.efficiencyScore * 1.5)
-    .sort((a, b) => b.delayedTrips - a.delayedTrips || b.efficiencyScore - a.efficiencyScore)
+  const inefficientRoutes = mostEfficient
+    ? [...scoredRoutes]
+      .filter((route) => route.status !== 'Active' || route.delayedTrips > 0 || route.efficiencyScore > mostEfficient.efficiencyScore * 1.5)
+      .sort((a, b) => b.delayedTrips - a.delayedTrips || b.efficiencyScore - a.efficiencyScore)
+    : []
+
+  const recommendations = [
+    fastest ? {
+      id: 'fastest',
+      strategy: 'Fastest',
+      status: 'Active',
+      ...fastest,
+      reasons: ['Lowest stored estimated travel time.'],
+    } : null,
+    lowestFuelCost ? {
+      id: 'lowest-fuel-cost',
+      strategy: 'Lowest fuel cost',
+      status: 'Active',
+      ...lowestFuelCost,
+      reasons: ['Lowest estimated fuel cost from route miles, estimated MPG, and average fuel price.'],
+    } : null,
+    {
+      id: 'lowest-toll',
+      strategy: 'Lowest toll',
+      status: 'Needs Data',
+      routeId: null,
+      routeName: 'Toll data unavailable',
+      estimatedFuelCost: null,
+      reasons: ['Toll amounts are not currently captured in route records. Add toll data or a map/toll API for this optimization.'],
+    },
+    mostEfficient ? {
+      id: 'most-efficient',
+      strategy: 'Most efficient',
+      status: 'Active',
+      ...mostEfficient,
+      reasons: ['Best weighted score using route distance and estimated time.'],
+    } : null,
+  ].filter(Boolean)
 
   return {
     assumptions: {
@@ -403,10 +458,10 @@ function getRouteOptimization(fuelAnalytics) {
     scoredRoutes,
     inefficientRoutes,
     multiStopOptimization: {
-      candidateTrips: initialTrips
+      candidateTrips: trips
         .filter((trip) => ['Scheduled', 'In Transit', 'Delayed'].includes(trip.status))
         .map((trip) => ({
-          id: trip.id,
+          id: String(trip._id),
           customer: trip.customer,
           route: trip.route,
           vehicle: trip.vehicle,
@@ -416,38 +471,7 @@ function getRouteOptimization(fuelAnalytics) {
         })),
       recommendation: 'Cluster stops by stored route corridor and schedule date. Add stop-level coordinates for true multi-stop sequencing.',
     },
-    recommendations: [
-      {
-        id: 'fastest',
-        strategy: 'Fastest',
-        status: 'Active',
-        ...fastest,
-        reasons: ['Lowest stored estimated travel time.'],
-      },
-      {
-        id: 'lowest-fuel-cost',
-        strategy: 'Lowest fuel cost',
-        status: 'Active',
-        ...lowestFuelCost,
-        reasons: ['Lowest estimated fuel cost from route miles, estimated MPG, and average fuel price.'],
-      },
-      {
-        id: 'lowest-toll',
-        strategy: 'Lowest toll',
-        status: 'Needs Data',
-        routeId: null,
-        routeName: 'Toll data unavailable',
-        estimatedFuelCost: null,
-        reasons: ['Toll amounts are not currently captured in route records. Add toll data or a map/toll API for this optimization.'],
-      },
-      {
-        id: 'most-efficient',
-        strategy: 'Most efficient',
-        status: 'Active',
-        ...mostEfficient,
-        reasons: ['Best weighted score using route distance and estimated time.'],
-      },
-    ],
+    recommendations,
   }
 }
 
@@ -503,35 +527,47 @@ function buildAssistantCapabilities({ revenue, fuel, fleet, drivers, operations,
   }
 }
 
-export async function buildAnalytics(createdByUid) {
-  const [invoices, fuelLogs, maintenanceRecords] = await Promise.all([
-    Invoice.find({ createdByUid }).lean(),
-    FuelLog.find({ createdByUid }).lean(),
-    MaintenanceRecord.find({ createdByUid }).lean(),
+export async function buildAnalytics(createdByUid, filters = {}) {
+  const scopedQuery = { createdByUid }
+  const invoiceQuery = { ...scopedQuery, ...getDateRangeFilter('issueDate', filters) }
+  const fuelLogQuery = { ...scopedQuery, ...getDateRangeFilter('date', filters) }
+  const maintenanceQuery = { ...scopedQuery, ...getDateRangeFilter('nextServiceDate', filters) }
+  const tripQuery = { ...scopedQuery, ...getDateRangeFilter('scheduledDate', filters) }
+
+  const [customers, routes, trips, vehicles, drivers, invoices, fuelLogs, maintenanceRecords] = await Promise.all([
+    Customer.find(scopedQuery).sort({ company: 1, createdAt: -1 }).lean(),
+    RouteRecord.find(scopedQuery).sort({ name: 1, createdAt: -1 }).lean(),
+    Trip.find(tripQuery).sort({ scheduledDate: -1, createdAt: -1 }).lean(),
+    Vehicle.find(scopedQuery).sort({ unit: 1, createdAt: -1 }).lean(),
+    Driver.find(scopedQuery).sort({ name: 1, createdAt: -1 }).lean(),
+    Invoice.find(invoiceQuery).sort({ issueDate: -1, createdAt: -1 }).lean(),
+    FuelLog.find(fuelLogQuery).sort({ date: -1, createdAt: -1 }).lean(),
+    MaintenanceRecord.find(maintenanceQuery).sort({ nextServiceDate: 1, createdAt: -1 }).lean(),
   ])
 
   const revenue = getInvoiceAnalytics(invoices)
   const fuel = getFuelAnalytics(fuelLogs)
-  const fleet = getFleetAnalytics(maintenanceRecords)
-  const drivers = getDriverAnalytics(fuelLogs)
-  const operations = getOperationalAnalytics()
+  const fleet = getFleetAnalytics(vehicles, maintenanceRecords)
+  const driverAnalytics = getDriverAnalytics(drivers, trips, fuelLogs)
+  const operations = getOperationalAnalytics(customers, routes, trips)
   const financial = getFinancialAnalytics(revenue, fuel, fleet)
-  const routeOptimization = getRouteOptimization(fuel)
-  const capabilities = buildAssistantCapabilities({ revenue, fuel, fleet, drivers, operations, financial, routeOptimization })
+  const routeOptimization = getRouteOptimization(routes, trips, fuel)
+  const capabilities = buildAssistantCapabilities({ revenue, fuel, fleet, drivers: driverAnalytics, operations, financial, routeOptimization })
 
   return {
     generatedAt: new Date().toISOString(),
+    reportPeriod: getReportPeriod(filters),
     revenue,
     fuel,
     fleet,
-    drivers,
+    drivers: driverAnalytics,
     operations,
     financial,
     routeOptimization,
     capabilities,
     dataNotes: [
-      'Revenue, fuel, and maintenance analytics use authenticated operational records scoped to the signed-in account.',
-      'Fleet, driver, customer, route, and trip analytics use TransportFlow workspace records currently available to analytics.',
+      'Report analytics use authenticated MongoDB records scoped to the signed-in account.',
+      'Invoice, trip, fuel, and maintenance activity is filtered by the selected report date range; customer, route, vehicle, and driver totals use current valid workspace records.',
       'Route optimization uses stored distance and estimated hours with fuel assumptions; no live traffic, GPS, weather, toll, or map API data is available.',
       'Fuel intelligence can flag anomaly indicators only. It cannot confirm fuel theft, leakage, card misuse, location mismatch, or driver intent without sensor, fuel-card, GPS, or inspection data.',
       'Fleet health predictions use service records, vehicle status, and mileage; no live diagnostic codes, tire sensors, or OEM telematics are available.',

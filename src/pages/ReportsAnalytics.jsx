@@ -1,15 +1,31 @@
 import { useEffect, useState } from 'react'
 import Card from '../components/ui/Card.jsx'
 import DataTable from '../components/ui/DataTable.jsx'
+import Field from '../components/ui/Field.jsx'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
+import Toolbar from '../components/ui/Toolbar.jsx'
 import useAuth from '../context/useAuth.js'
 import { analyticsApi } from '../services/analyticsApi.js'
 import { formatCurrencyINR } from '../utils/currency.js'
+import { todayDateInputValue } from '../utils/date.js'
+
+const MILES_TO_KILOMETERS = 1.60934
 
 function percent(value) {
   return `${Number(value) || 0}%`
+}
+
+function currentMonthStartInputValue() {
+  const today = new Date()
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+  const localDate = new Date(monthStart.getTime() - monthStart.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 10)
+}
+
+function formatKilometers(value) {
+  return `${Math.round((Number(value) || 0) * MILES_TO_KILOMETERS).toLocaleString()} km`
 }
 
 function SectionHeading({ eyebrow, title, description }) {
@@ -25,6 +41,8 @@ function SectionHeading({ eyebrow, title, description }) {
 export default function ReportsAnalytics() {
   const { getAuthToken } = useAuth()
   const [analytics, setAnalytics] = useState(null)
+  const [startDate, setStartDate] = useState(currentMonthStartInputValue)
+  const [endDate, setEndDate] = useState(todayDateInputValue)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -34,7 +52,7 @@ export default function ReportsAnalytics() {
       setError('')
 
       try {
-        const data = await analyticsApi.getReports(getAuthToken)
+        const data = await analyticsApi.getReports(getAuthToken, { startDate, endDate })
         setAnalytics(data)
       } catch (requestError) {
         setError(requestError.message)
@@ -44,7 +62,7 @@ export default function ReportsAnalytics() {
     }
 
     loadAnalytics()
-  }, [getAuthToken])
+  }, [endDate, getAuthToken, startDate])
 
   if (isLoading) {
     return (
@@ -72,10 +90,11 @@ export default function ReportsAnalytics() {
   const drivers = analytics.drivers || {}
   const fuel = analytics.fuel || {}
   const routeOptimization = analytics.routeOptimization || {}
+  const activeRangeText = startDate && endDate ? `${startDate} to ${endDate}` : 'selected dates'
 
   const routeColumns = [
     { key: 'routeName', label: 'Route' },
-    { key: 'distanceMiles', label: 'Distance' },
+    { key: 'distanceMiles', label: 'Distance (km)', render: (row) => formatKilometers(row.distanceMiles) },
     { key: 'estimatedHours', label: 'Hours' },
     { key: 'estimatedFuelCost', label: 'Fuel Estimate', render: (row) => formatCurrencyINR(row.estimatedFuelCost) },
   ]
@@ -105,8 +124,33 @@ export default function ReportsAnalytics() {
       <PageHeader
         eyebrow="Business Reports"
         title="Reports & Analytics"
-        description="Simple summaries for billing, trips, vehicles, drivers, fuel, and service."
+        description={`Simple summaries for billing, trips, vehicles, drivers, fuel, and service from ${activeRangeText}.`}
       />
+
+      <Card title="Report date range" eyebrow="Current period">
+        <Toolbar>
+          <Field label="Start date">
+            <input
+              className="form-control"
+              type="date"
+              value={startDate}
+              max={endDate || todayDateInputValue()}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </Field>
+          <Field label="End date">
+            <input
+              className="form-control"
+              type="date"
+              value={endDate}
+              min={startDate}
+              max={todayDateInputValue()}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </Field>
+        </Toolbar>
+        <p className="table-meta">Showing valid workspace records for {activeRangeText}. Customer, route, vehicle, and driver totals use current records.</p>
+      </Card>
 
       <section className="report-section" aria-labelledby="revenue-reports">
         <SectionHeading eyebrow="Revenue Reports" title="Billing and collections" description="Track billed, collected, and pending amounts." />
